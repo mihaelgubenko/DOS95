@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Windows 95 - DOS Web System</title>
+    <link rel="stylesheet" href="win95.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Desktop -->
+    <div class="win95-desktop" id="desktop">
+        
+        <!-- Desktop Icons -->
+        <div class="win95-desktop-icon" style="top: 10px; left: 10px;" data-action="my-computer">
+            <div class="win95-desktop-icon-image">💻</div>
+            <div class="win95-desktop-icon-label">Мой компьютер</div>
+        </div>
+        
+        <div class="win95-desktop-icon" style="top: 90px; left: 10px;" data-action="open-terminal">
+            <div class="win95-desktop-icon-image">📁</div>
+            <div class="win95-desktop-icon-label">MS-DOS Prompt</div>
+        </div>
+        
+        <div class="win95-desktop-icon" style="top: 170px; left: 10px;" data-action="open-explorer">
+            <div class="win95-desktop-icon-image">📂</div>
+            <div class="win95-desktop-icon-label">Проводник</div>
+        </div>
+        
+        <div class="win95-desktop-icon" style="top: 250px; left: 10px;" data-action="open-doctor">
+            <div class="win95-desktop-icon-image">🧠</div>
+            <div class="win95-desktop-icon-label">ELIZA</div>
+        </div>
+        
+        <div class="win95-desktop-icon" style="top: 330px; left: 10px;" data-action="open-about">
+            <div class="win95-desktop-icon-image">ℹ️</div>
+            <div class="win95-desktop-icon-label">О системе</div>
+        </div>
+
+    </div>
+
+    <!-- DOS Terminal Window -->
+    <div class="win95-window active" id="terminal-window" style="top: 50px; left: 100px; width: 800px; height: 500px;">
+        <div class="win95-title-bar">
+            <div class="win95-title-bar-icon">📟</div>
+            <div class="win95-title-bar-text">MS-DOS Prompt - C:\</div>
+            <div class="win95-title-bar-buttons">
+                <button class="win95-title-bar-button" data-action="minimize">_</button>
+                <button class="win95-title-bar-button" data-action="maximize">□</button>
+                <button class="win95-title-bar-button" data-action="close">×</button>
+            </div>
+        </div>
+        <div class="win95-window-content">
+            <!-- DOS Terminal -->
+            <div class="terminal" id="terminal" style="height: 100%; border: none;">
+                <div id="output" class="output">
+                    <div class="boot-screen">
+╔════════════════════════════════════════════════════════════════╗
+║                                                                ║
+║              DOS Web System Version 1.0.0                      ║
+║              Windows 95 Edition                                ║
+║              Copyright (c) 2025. All rights reserved.          ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+
+Запуск системы...
+Загрузка COMMAND.COM...
+Инициализация виртуальной файловой системы...
+Готово.
+
+Введите HELP для списка доступных команд.
+
+                    </div>
+                </div>
+
+                <!-- Строка ввода -->
+                <div class="input-line">
+                    <span id="prompt" class="prompt">C:\></span>
+                    <input type="text" id="command-input" class="command-input" autofocus autocomplete="off" spellcheck="false">
+                </div>
+            </div>
+        </div>
+        <div class="win95-resize-handle"></div>
+    </div>
+
+    <!-- Start Menu -->
+    <div class="win95-start-menu" id="start-menu">
+        <div class="win95-start-menu-banner">Windows 95</div>
+        <div class="win95-start-menu-items">
+            <div class="win95-menu-item" data-action="open-terminal">
+                <div class="win95-menu-item-icon">📟</div>
+                MS-DOS Prompt
+            </div>
+            <div class="win95-menu-item" data-action="open-explorer">
+                <div class="win95-menu-item-icon">📂</div>
+                Проводник
+            </div>
+            <div class="win95-menu-item" data-action="open-doctor">
+                <div class="win95-menu-item-icon">🧠</div>
+                ELIZA Psychotherapist
+            </div>
+            <div class="win95-menu-separator"></div>
+            <div class="win95-menu-item" data-action="open-about">
+                <div class="win95-menu-item-icon">ℹ️</div>
+                О системе
+            </div>
+            <div class="win95-menu-separator"></div>
+            <div class="win95-menu-item" data-action="shutdown">
+                <div class="win95-menu-item-icon">⏻</div>
+                Завершение работы...
+            </div>
+        </div>
+    </div>
+
+    <!-- Taskbar -->
+    <div class="win95-taskbar">
+        <button class="win95-start-button" id="start-button">
+            <div class="win95-start-icon">⊞</div>
+            <span>Пуск</span>
+        </button>
+        
+        <div class="win95-taskbar-divider"></div>
+        
+        <div class="win95-taskbar-items" id="taskbar-items">
+            <div class="win95-taskbar-item active" data-window="terminal-window">
+                <span class="win95-taskbar-item-icon">📟</span>
+                MS-DOS Prompt
+            </div>
+        </div>
+        
+        <div class="win95-taskbar-tray">
+            <div class="win95-clock" id="clock">12:00</div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+    <script src="explorer-enhanced.js"></script>
+    <script src="win95-manager.js"></script>
+</body>
+</html>
+

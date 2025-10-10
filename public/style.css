@@ -1,0 +1,281 @@
+/* Ретро DOS стиль */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Courier New', Courier, monospace;
+    background: #000000;
+    color: #00ff00;
+    overflow: hidden;
+    height: 100vh;
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* Заголовок */
+.system-header {
+    background: #0000aa;
+    color: #ffffff;
+    padding: 10px 20px;
+    text-align: center;
+    border: 2px solid #5555ff;
+    margin-bottom: 10px;
+}
+
+.system-header .title {
+    font-size: 20px;
+    font-weight: bold;
+    letter-spacing: 2px;
+}
+
+.system-header .subtitle {
+    font-size: 12px;
+    margin-top: 5px;
+    color: #aaaaaa;
+}
+
+/* Терминал */
+.terminal {
+    flex: 1;
+    background: #000000;
+    border: 2px solid #00ff00;
+    padding: 15px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 
+        inset 0 0 50px rgba(0, 255, 0, 0.1),
+        0 0 20px rgba(0, 255, 0, 0.3);
+}
+
+.output {
+    flex: 1;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    margin-bottom: 10px;
+    line-height: 1.4;
+    font-size: 14px;
+    text-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+}
+
+/* Кастомный скроллбар */
+.output::-webkit-scrollbar {
+    width: 10px;
+}
+
+.output::-webkit-scrollbar-track {
+    background: #001100;
+}
+
+.output::-webkit-scrollbar-thumb {
+    background: #00ff00;
+    border: 1px solid #000000;
+}
+
+.output::-webkit-scrollbar-thumb:hover {
+    background: #00cc00;
+}
+
+/* Экран загрузки */
+.boot-screen {
+    color: #00ff00;
+    animation: fadeIn 1s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Строка команды */
+.command-line {
+    color: #00ff00;
+    margin-bottom: 5px;
+}
+
+.command-output {
+    color: #00ff00;
+    margin-bottom: 10px;
+}
+
+.error-output {
+    color: #ff5555;
+    margin-bottom: 10px;
+}
+
+/* Строка ввода */
+.input-line {
+    display: flex;
+    align-items: center;
+    border-top: 1px solid #003300;
+    padding-top: 10px;
+}
+
+.prompt {
+    color: #00ff00;
+    margin-right: 5px;
+    font-weight: bold;
+    text-shadow: 0 0 5px rgba(0, 255, 0, 0.7);
+}
+
+.command-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: #00ff00;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 14px;
+    outline: none;
+    caret-color: #00ff00;
+    text-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+}
+
+.command-input::selection {
+    background: #00ff00;
+    color: #000000;
+}
+
+/* Курсор мигающий */
+@keyframes blink {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+}
+
+.cursor {
+    display: inline-block;
+    width: 8px;
+    height: 14px;
+    background: #00ff00;
+    animation: blink 1s infinite;
+}
+
+/* Статус бар */
+.status-bar {
+    background: #0000aa;
+    color: #ffffff;
+    padding: 8px 15px;
+    display: flex;
+    justify-content: space-between;
+    border: 2px solid #5555ff;
+    margin-top: 10px;
+    font-size: 12px;
+}
+
+.status-bar span {
+    padding: 0 10px;
+}
+
+/* DOCTOR режим */
+.doctor-mode {
+    color: #ffff00 !important;
+}
+
+.doctor-mode .prompt {
+    color: #ffff00 !important;
+}
+
+.doctor-mode .command-input {
+    color: #ffff00 !important;
+    caret-color: #ffff00 !important;
+}
+
+.doctor-mode .terminal {
+    border-color: #ffff00;
+    box-shadow: 
+        inset 0 0 50px rgba(255, 255, 0, 0.1),
+        0 0 20px rgba(255, 255, 0, 0.3);
+}
+
+/* Специальные стили для вывода */
+.ascii-art {
+    color: #00aaaa;
+    font-weight: bold;
+}
+
+.warning {
+    color: #ffaa00;
+}
+
+.success {
+    color: #00ff00;
+}
+
+/* Эффект CRT монитора */
+.terminal::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 0, 0, 0.15),
+        rgba(0, 0, 0, 0.15) 1px,
+        transparent 1px,
+        transparent 2px
+    );
+    pointer-events: none;
+}
+
+/* Эффект свечения экрана */
+.terminal::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(
+        ellipse at center,
+        rgba(0, 255, 0, 0.05) 0%,
+        rgba(0, 0, 0, 0.5) 100%
+    );
+    pointer-events: none;
+}
+
+/* Анимация мерцания для старого монитора */
+@keyframes flicker {
+    0% { opacity: 0.98; }
+    5% { opacity: 1; }
+    10% { opacity: 0.98; }
+    15% { opacity: 1; }
+    20% { opacity: 0.99; }
+    100% { opacity: 1; }
+}
+
+.terminal {
+    animation: flicker 5s infinite;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+    .container {
+        padding: 10px;
+    }
+
+    .output {
+        font-size: 12px;
+    }
+
+    .system-header .title {
+        font-size: 16px;
+    }
+
+    .status-bar {
+        font-size: 10px;
+    }
+}
+

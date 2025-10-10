@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DOS Web System v1.0</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Заголовок системы -->
+        <div class="system-header">
+            <div class="title">DOS Web System v1.0</div>
+            <div class="subtitle">Виртуальная DOS среда с AI интеграцией</div>
+        </div>
+
+        <!-- Терминал -->
+        <div id="terminal" class="terminal">
+            <div id="output" class="output">
+                <div class="boot-screen">
+╔════════════════════════════════════════════════════════════════╗
+║                                                                ║
+║              DOS Web System Version 1.0.0                      ║
+║              Copyright (c) 2025. All rights reserved.          ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+
+Запуск системы...
+Загрузка COMMAND.COM...
+Инициализация виртуальной файловой системы...
+Готово.
+
+Введите HELP для списка доступных команд.
+
+                </div>
+            </div>
+
+            <!-- Строка ввода -->
+            <div class="input-line">
+                <span id="prompt" class="prompt">C:\&gt;</span>
+                <input type="text" id="command-input" class="command-input" autofocus autocomplete="off" spellcheck="false">
+            </div>
+        </div>
+
+        <!-- Статус бар -->
+        <div class="status-bar">
+            <span id="status-time"></span>
+            <span id="status-session">Session: Active</span>
+            <span id="status-mode">Mode: NORMAL</span>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
+
