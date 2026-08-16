@@ -1,10 +1,12 @@
-// DOS Web System - Client Side Script
+// DOS95 - Client Side Script
+let allowInternalNavigation = false;
 
 class DOSTerminal {
     constructor() {
         this.output = document.getElementById('output');
         this.input = document.getElementById('command-input');
         this.prompt = document.getElementById('prompt');
+        this.terminal = document.getElementById('terminal');
         this.statusMode = document.getElementById('status-mode');
         this.statusTime = document.getElementById('status-time');
         
@@ -39,7 +41,8 @@ class DOSTerminal {
     }
 
     generateSessionId() {
-        return 'session_' + Math.random().toString(36).substring(2, 11);
+        const id = globalThis.crypto?.randomUUID?.() || Math.random().toString(36).substring(2, 11);
+        return 'session_' + id;
     }
 
     updateTime() {
@@ -105,8 +108,9 @@ class DOSTerminal {
             return;
         }
 
+        let response;
         try {
-            const response = await fetch('/api/command', {
+            response = await window.dos95Api.fetch('/api/command', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -116,34 +120,46 @@ class DOSTerminal {
                     sessionId: this.sessionId
                 })
             });
-
-            const result = await response.json();
-
-            if (result.success) {
-                if (result.output) {
-                    this.appendToOutput(result.output, 'command-output');
-                }
-                
-                if (result.currentDir) {
-                    this.currentDir = result.currentDir;
-                    this.updatePrompt();
-                }
-
-                // Переключение режима DOCTOR
-                if (result.doctorMode !== undefined) {
-                    this.setDoctorMode(result.doctorMode);
-                }
-
-                // Открыть новое окно (для команды WIN95)
-                if (result.openWindow) {
-                    window.open(result.openWindow, '_blank');
-                }
-            } else {
-                this.appendToOutput(result.output || 'Ошибка выполнения команды\n', 'error-output');
-            }
-
         } catch (error) {
             this.appendToOutput(`Ошибка связи с сервером: ${error.message}\n`, 'error-output');
+            this.scrollToBottom();
+            return;
+        }
+
+        let result;
+        try {
+            result = await response.json();
+        } catch {
+            this.appendToOutput(`Сервер вернул некорректный ответ (HTTP ${response.status}).\n`, 'error-output');
+            this.scrollToBottom();
+            return;
+        }
+
+        if (!response.ok || !result.success) {
+            this.appendToOutput(
+                result.output || result.message || `Ошибка сервера (HTTP ${response.status}).\n`,
+                'error-output'
+            );
+            this.scrollToBottom();
+            return;
+        }
+
+        try {
+            if (result.output) this.appendToOutput(result.output, 'command-output');
+
+            if (result.currentDir) {
+                this.currentDir = result.currentDir;
+                this.updatePrompt();
+            }
+
+            if (result.doctorMode !== undefined) this.setDoctorMode(result.doctorMode);
+            if (result.openWindow) {
+                allowInternalNavigation = true;
+                window.location.assign(result.openWindow);
+            }
+        } catch (error) {
+            console.error('Terminal rendering error:', error);
+            this.appendToOutput('Ошибка интерфейса терминала. Обновите страницу.\n', 'error-output');
         }
 
         // Прокрутить вниз
@@ -162,20 +178,17 @@ class DOSTerminal {
     }
 
     updatePrompt() {
-        this.prompt.textContent = `${this.currentDir}>`;
+        if (this.prompt) this.prompt.textContent = `${this.currentDir}>`;
     }
 
     setDoctorMode(enabled) {
         this.doctorMode = enabled;
-        const terminal = document.querySelector('.terminal');
-        
+        if (this.terminal) this.terminal.classList.toggle('doctor-mode', enabled);
+        if (this.statusMode) this.statusMode.textContent = enabled ? 'Mode: DOCTOR' : 'Mode: NORMAL';
+
         if (enabled) {
-            terminal.classList.add('doctor-mode');
-            this.statusMode.textContent = 'Mode: DOCTOR';
-            this.prompt.textContent = 'YOU>';
+            if (this.prompt) this.prompt.textContent = 'YOU>';
         } else {
-            terminal.classList.remove('doctor-mode');
-            this.statusMode.textContent = 'Mode: NORMAL';
             this.updatePrompt();
         }
     }
@@ -195,6 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Предотвратить случайное закрытие страницы
 window.addEventListener('beforeunload', (e) => {
+    if (allowInternalNavigation) return;
     e.preventDefault();
     e.returnValue = '';
 });

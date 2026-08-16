@@ -1,786 +1,330 @@
-// Enhanced File Explorer для Windows 95
-// Полный функционал: создание, удаление, редактирование, копирование, переименование
+'use strict';
 
 class EnhancedFileExplorer {
     constructor(windowId) {
+        const unique = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
         this.windowId = windowId;
         this.currentPath = 'C:\\';
-        this.sessionId = 'explorer_' + Date.now();
+        this.sessionId = `explorer_${unique}`;
+        this.uniqueId = `exp_${unique}`;
+        this.selectedRow = null;
         this.selectedItem = null;
         this.clipboard = null;
-        
-        // Уникальные ID для элементов этого окна
-        this.uniqueId = 'exp_' + Date.now();
     }
 
     async init() {
         const windowElement = document.getElementById(this.windowId);
         if (!windowElement) return;
-
         const content = windowElement.querySelector('.win95-window-content');
-        content.innerHTML = this.getExplorerHTML();
-        
-        this.attachEventListeners();
+        content.innerHTML = `
+            <div style="display:flex;flex-direction:column;height:100%;background:var(--win95-gray)">
+                <div style="padding:4px;border-bottom:1px solid var(--win95-dark-gray);display:flex;gap:4px">
+                    <button class="win95-button" data-role="up" title="Вверх">▲</button>
+                    <div class="win95-inset-panel" style="flex:1;padding:4px;color:#000">
+                        📂 <span data-role="path">C:\\</span>
+                    </div>
+                    <button class="win95-button" data-role="refresh" title="Обновить">🔄</button>
+                </div>
+                <div style="padding:4px;border-bottom:1px solid var(--win95-dark-gray);display:flex;gap:4px;flex-wrap:wrap">
+                    <button class="win95-button" data-role="new-file">📄 Создать файл</button>
+                    <button class="win95-button" data-role="new-folder">📁 Создать папку</button>
+                    <button class="win95-button" data-role="open" disabled>📖 Открыть</button>
+                    <button class="win95-button" data-role="edit" disabled>✏️ Редактировать</button>
+                    <button class="win95-button" data-role="rename" disabled>🔤 Переименовать</button>
+                    <button class="win95-button" data-role="copy" disabled>📋 Копировать</button>
+                    <button class="win95-button" data-role="paste" disabled>📌 Вставить</button>
+                    <button class="win95-button" data-role="delete" disabled style="color:#a00">🗑️ Удалить</button>
+                </div>
+                <div style="flex:1;padding:4px;overflow:auto">
+                    <div class="win95-inset-panel" style="height:100%;background:#fff;padding:8px;box-sizing:border-box">
+                        <table style="width:100%;border-collapse:collapse;font-size:11px;color:#000">
+                            <thead><tr style="background:var(--win95-gray)"><th align="left">Имя</th><th align="left">Размер</th><th align="left">Тип</th></tr></thead>
+                            <tbody data-role="files"><tr><td colspan="3" style="padding:20px;text-align:center">Загрузка...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div style="padding:4px 8px;border-top:2px solid white;color:#000" data-role="status">Готово</div>
+            </div>`;
+        this.root = content;
+        this.attachEvents();
         await this.loadDirectory();
     }
 
-    getExplorerHTML() {
-        return `
-            <div class="explorer-container" style="display: flex; flex-direction: column; height: 100%; background: var(--win95-gray);">
-                <!-- Toolbar -->
-                <div class="explorer-toolbar" style="padding: 4px; border-bottom: 1px solid var(--win95-dark-gray); display: flex; gap: 4px; flex-wrap: wrap;">
-                    <button class="win95-button" id="explorer-back-${this.uniqueId}" title="Назад" style="padding: 2px 8px; min-width: auto;">◄</button>
-                    <button class="win95-button" id="explorer-up-${this.uniqueId}" title="Вверх" style="padding: 2px 8px; min-width: auto;">▲</button>
-                    <div class="win95-inset-panel" style="flex: 1; padding: 2px 4px; display: flex; align-items: center; min-width: 100px;">
-                        <span>📂</span>
-                        <span id="explorer-path-${this.uniqueId}" style="margin-left: 4px; color: #000000; font-weight: bold;">C:\\</span>
-                    </div>
-                    <button class="win95-button" id="explorer-refresh-${this.uniqueId}" title="Обновить" style="padding: 2px 8px; min-width: auto;">🔄</button>
-                </div>
-                
-                <!-- Action Buttons -->
-                <div class="explorer-actions" style="padding: 4px; border-bottom: 1px solid var(--win95-dark-gray); display: flex; gap: 4px; flex-wrap: wrap; background: var(--win95-gray);">
-                    <button class="win95-button" id="explorer-new-file-${this.uniqueId}" title="Создать файл" style="padding: 4px 8px;">📄 Создать файл</button>
-                    <button class="win95-button" id="explorer-new-folder-${this.uniqueId}" title="Создать папку" style="padding: 4px 8px;">📁 Создать папку</button>
-                    <div style="width: 1px; height: 20px; background: var(--win95-dark-gray); margin: 0 4px;"></div>
-                    <button class="win95-button" id="explorer-open-${this.uniqueId}" title="Открыть" style="padding: 4px 8px;" disabled>📖 Открыть</button>
-                    <button class="win95-button" id="explorer-edit-${this.uniqueId}" title="Редактировать" style="padding: 4px 8px;" disabled>✏️ Редактировать</button>
-                    <div style="width: 1px; height: 20px; background: var(--win95-dark-gray); margin: 0 4px;"></div>
-                    <button class="win95-button" id="explorer-rename-${this.uniqueId}" title="Переименовать" style="padding: 4px 8px;" disabled>🔤 Переименовать</button>
-                    <button class="win95-button" id="explorer-copy-${this.uniqueId}" title="Копировать" style="padding: 4px 8px;" disabled>📋 Копировать</button>
-                    <button class="win95-button" id="explorer-paste-${this.uniqueId}" title="Вставить" style="padding: 4px 8px;" disabled>📌 Вставить</button>
-                    <button class="win95-button" id="explorer-delete-${this.uniqueId}" title="Удалить" style="padding: 4px 8px; color: red;" disabled>🗑️ Удалить</button>
-                </div>
-
-                <!-- File List -->
-                <div class="explorer-content" style="flex: 1; padding: 4px; overflow: auto;">
-                    <div class="win95-inset-panel" id="explorer-files-container-${this.uniqueId}" style="height: 100%; background: white; padding: 8px; position: relative;">
-                        <table id="explorer-table-${this.uniqueId}" style="width: 100%; border-collapse: collapse; font-size: 11px; color: #000000 !important;">
-                            <thead style="color: #000000 !important;">
-                                <tr style="background: var(--win95-gray); border-bottom: 1px solid var(--win95-dark-gray); color: #000000 !important;">
-                                    <th style="text-align: left; padding: 4px; color: #000000 !important;">Имя</th>
-                                    <th style="text-align: left; padding: 4px; color: #000000 !important;">Размер</th>
-                                    <th style="text-align: left; padding: 4px; color: #000000 !important;">Тип</th>
-                                </tr>
-                            </thead>
-                            <tbody id="explorer-files-${this.uniqueId}" style="color: #000000 !important;">
-                                <tr><td colspan="3" style="text-align: center; padding: 20px; color: #000000 !important;">Загрузка...</td></tr>
-                            </tbody>
-                        </table>
-                        
-                        <!-- Context Menu -->
-                        <div id="explorer-context-menu" style="display: none; position: absolute; background: var(--win95-gray); border: 2px outset; box-shadow: 2px 2px 4px rgba(0,0,0,0.3); z-index: 1000; min-width: 150px;">
-                            <div class="context-menu-item" data-action="open" style="padding: 4px 20px; cursor: pointer;">Открыть</div>
-                            <div class="context-menu-item" data-action="edit" style="padding: 4px 20px; cursor: pointer;">Редактировать</div>
-                            <hr style="margin: 2px 0; border: none; border-top: 1px solid #808080;">
-                            <div class="context-menu-item" data-action="rename" style="padding: 4px 20px; cursor: pointer;">Переименовать</div>
-                            <div class="context-menu-item" data-action="copy" style="padding: 4px 20px; cursor: pointer;">Копировать</div>
-                            <div class="context-menu-item" data-action="paste" style="padding: 4px 20px; cursor: pointer;">Вставить</div>
-                            <hr style="margin: 2px 0; border: none; border-top: 1px solid #808080;">
-                            <div class="context-menu-item" data-action="delete" style="padding: 4px 20px; cursor: pointer; color: red;">Удалить</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Status Bar -->
-                <div class="explorer-statusbar" style="padding: 4px 8px; border-top: 2px solid white; background: var(--win95-gray); font-size: 11px; color: #000000 !important;">
-                    <span id="explorer-status-${this.uniqueId}" style="color: #000000 !important;">Готово</span>
-                </div>
-            </div>
-        `;
+    element(role) {
+        return this.root.querySelector(`[data-role="${role}"]`);
     }
 
-    attachEventListeners() {
-        // Кнопки навигации - используем uniqueId
-        document.getElementById(`explorer-back-${this.uniqueId}`)?.addEventListener('click', () => this.goUp());
-        document.getElementById(`explorer-up-${this.uniqueId}`)?.addEventListener('click', () => this.goUp());
-        document.getElementById(`explorer-refresh-${this.uniqueId}`)?.addEventListener('click', () => this.loadDirectory());
-        
-        // Кнопки создания
-        document.getElementById(`explorer-new-file-${this.uniqueId}`)?.addEventListener('click', () => this.createNewFile());
-        document.getElementById(`explorer-new-folder-${this.uniqueId}`)?.addEventListener('click', () => this.createNewFolder());
-        
-        // Кнопки просмотра/редактирования
-        document.getElementById(`explorer-open-${this.uniqueId}`)?.addEventListener('click', () => {
-            if (this.selectedItemData) {
-                if (this.selectedItemData.isDir) {
-                    this.openDirectory(this.selectedItemData.name);
-                } else {
-                    this.openFile(this.selectedItemData.name);
-                }
-            }
+    attachEvents() {
+        this.element('up').addEventListener('click', () => this.goUp());
+        this.element('refresh').addEventListener('click', () => this.loadDirectory());
+        this.element('new-file').addEventListener('click', () => this.createNewFile());
+        this.element('new-folder').addEventListener('click', () => this.createNewFolder());
+        this.element('open').addEventListener('click', () => this.openSelected());
+        this.element('edit').addEventListener('click', () => this.selectedItem && this.editFile(this.selectedItem.name));
+        this.element('rename').addEventListener('click', () => this.selectedItem && this.renameItem(this.selectedItem.name));
+        this.element('copy').addEventListener('click', () => this.copyItem());
+        this.element('paste').addEventListener('click', () => this.pasteItem());
+        this.element('delete').addEventListener('click', () => this.deleteItem());
+    }
+
+    async requestFile(action, data = {}) {
+        const response = await window.dos95Api.fetch('/api/file', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action, path: data.path ?? '.', sessionId: this.sessionId, ...data })
         });
-        document.getElementById(`explorer-edit-${this.uniqueId}`)?.addEventListener('click', () => {
-            if (this.selectedItemData && !this.selectedItemData.isDir) {
-                this.editFile(this.selectedItemData.name);
-            }
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.message || 'Файловая операция не выполнена');
+        return result;
+    }
+
+    async requestCommand(command) {
+        const response = await window.dos95Api.fetch('/api/command', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ command, sessionId: this.sessionId })
         });
-        
-        // Кнопки операций
-        document.getElementById(`explorer-rename-${this.uniqueId}`)?.addEventListener('click', () => {
-            if (this.selectedItemData) this.renameItem(this.selectedItemData.name);
-        });
-        document.getElementById(`explorer-copy-${this.uniqueId}`)?.addEventListener('click', () => {
-            if (this.selectedItemData) this.copyItem(this.selectedItemData.name);
-        });
-        document.getElementById(`explorer-paste-${this.uniqueId}`)?.addEventListener('click', () => this.pasteItem());
-        document.getElementById(`explorer-delete-${this.uniqueId}`)?.addEventListener('click', () => {
-            if (this.selectedItemData) this.deleteItem(this.selectedItemData.name, this.selectedItemData.isDir);
-        });
-        
-        // Контекстное меню
-        document.querySelectorAll('.context-menu-item').forEach(item => {
-            item.addEventListener('click', async (e) => {
-                const action = item.dataset.action;
-                this.hideContextMenu();
-                await this.handleContextAction(action);
-            });
-            
-            item.addEventListener('mouseenter', (e) => {
-                e.target.style.background = 'var(--win95-blue)';
-                e.target.style.color = 'white';
-            });
-            
-            item.addEventListener('mouseleave', (e) => {
-                e.target.style.background = '';
-                e.target.style.color = '';
-            });
-        });
-        
-        // Закрытие контекстного меню при клике вне его
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('#explorer-context-menu')) {
-                this.hideContextMenu();
-            }
-        });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.output || 'Команда не выполнена');
+        return result;
     }
 
     async loadDirectory() {
         try {
-            const response = await fetch('/api/command', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    command: 'DIR',
-                    sessionId: this.sessionId
-                })
-            });
-
-            const result = await response.json();
-            
-            if (result.success) {
-                this.currentPath = result.currentDir;
-                this.updatePathDisplay();
-                this.parseAndDisplayFiles(result.output);
-            }
+            const result = await this.requestFile('list');
+            this.currentPath = result.path;
+            this.element('path').textContent = this.currentPath;
+            const title = document.getElementById(this.windowId)?.querySelector('.win95-title-bar-text');
+            if (title) title.textContent = `Проводник - ${this.currentPath}`;
+            this.renderItems(result.items);
         } catch (error) {
-            this.showStatus('Ошибка загрузки файлов');
+            this.showStatus(error.message);
         }
     }
 
-    parseAndDisplayFiles(dirOutput) {
-        const tbody = document.getElementById(`explorer-files-${this.uniqueId}`);
-        if (!tbody) return;
-
-        tbody.innerHTML = '';
-        const lines = dirOutput.split('\n');
-        const items = [];
-
-        for (const line of lines) {
-            const match = line.match(/^\s*\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2}\s+(?:<DIR>|(\d+))\s+(.+)$/);
-            if (match) {
-                const size = match[1] || '<DIR>';
-                const name = match[2]?.trim();
-                if (name) {
-                    items.push({ name, size, isDir: size === '<DIR>' });
-                }
-            }
-        }
-
-        if (items.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 20px; color: #000000 !important;">Папка пуста</td></tr>';
+    renderItems(items) {
+        const body = this.element('files');
+        body.replaceChildren();
+        this.selectedItem = null;
+        this.selectedRow = null;
+        this.updateButtons();
+        if (!items.length) {
+            const row = body.insertRow();
+            const cell = row.insertCell();
+            cell.colSpan = 3;
+            cell.textContent = 'Папка пуста';
+            cell.style.cssText = 'padding:20px;text-align:center';
+            this.showStatus('Объектов: 0');
             return;
         }
 
-        items.forEach(item => {
-            const row = document.createElement('tr');
+        for (const item of items) {
+            const row = body.insertRow();
             row.style.cursor = 'pointer';
-            row.dataset.itemName = item.name;
-            row.dataset.itemIsDir = item.isDir;
-
-            // Hover effect
-            row.addEventListener('mouseenter', () => {
-                if (row !== this.selectedItem) {
-                    row.style.background = '#e0e0e0';
-                }
-            });
-            row.addEventListener('mouseleave', () => {
-                if (row !== this.selectedItem) {
-                    row.style.background = '';
-                }
-            });
-
-            // Single click - select
-            row.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.selectItem(row, item);
-            });
-
-            // Double click - open
-            row.addEventListener('dblclick', () => {
-                if (item.isDir) {
-                    this.openDirectory(item.name);
-                } else {
-                    this.openFile(item.name);
-                }
-            });
-
-            // Right click - context menu
-            row.addEventListener('contextmenu', (e) => {
-                e.preventDefault();
-                this.selectItem(row, item);
-                this.showContextMenu(e.pageX, e.pageY);
-            });
-
-            const icon = item.isDir ? '📁' : '📄';
-            const type = item.isDir ? 'Папка' : 'Файл';
-
-            row.innerHTML = `
-                <td style="padding: 4px; color: #000000 !important;">${icon} ${item.name}</td>
-                <td style="padding: 4px; color: #000000 !important;">${item.isDir ? '' : item.size + ' б'}</td>
-                <td style="padding: 4px; color: #000000 !important;">${type}</td>
-            `;
-            
-            // Принудительно установить черный цвет
-            row.style.color = '#000000';
-
-            tbody.appendChild(row);
-        });
-
+            const nameCell = row.insertCell();
+            const sizeCell = row.insertCell();
+            const typeCell = row.insertCell();
+            nameCell.textContent = `${item.type === 'dir' ? '📁' : '📄'} ${item.name}`;
+            sizeCell.textContent = item.type === 'file' ? `${item.size} б` : '';
+            typeCell.textContent = item.type === 'dir' ? 'Папка' : 'Файл';
+            for (const cell of [nameCell, sizeCell, typeCell]) cell.style.padding = '4px';
+            row.addEventListener('click', () => this.select(row, item));
+            row.addEventListener('dblclick', () => item.type === 'dir' ? this.openDirectory(item.name) : this.openFile(item.name));
+        }
         this.showStatus(`Объектов: ${items.length}`);
     }
 
-    selectItem(row, item) {
-        // Снять выделение с предыдущего
-        if (this.selectedItem) {
-            this.selectedItem.style.background = '';
-            this.selectedItem.style.color = '';
+    select(row, item) {
+        if (this.selectedRow) {
+            this.selectedRow.style.background = '';
+            this.selectedRow.style.color = '';
         }
-        
-        // Выделить новый
-        this.selectedItem = row;
-        this.selectedItem.style.background = 'var(--win95-blue)';
-        this.selectedItem.style.color = 'white';
-        this.selectedItemData = item;
-        
-        // Обновить кнопки
-        this.updateActionButtons();
-    }
-    
-    updateActionButtons() {
-        const hasSelection = !!this.selectedItemData;
-        const hasClipboard = !!this.clipboard;
-        const isFile = hasSelection && !this.selectedItemData.isDir;
-        
-        // Обновить состояние кнопок с уникальными ID
-        const openBtn = document.getElementById(`explorer-open-${this.uniqueId}`);
-        const editBtn = document.getElementById(`explorer-edit-${this.uniqueId}`);
-        const renameBtn = document.getElementById(`explorer-rename-${this.uniqueId}`);
-        const copyBtn = document.getElementById(`explorer-copy-${this.uniqueId}`);
-        const pasteBtn = document.getElementById(`explorer-paste-${this.uniqueId}`);
-        const deleteBtn = document.getElementById(`explorer-delete-${this.uniqueId}`);
-        
-        // Открыть - доступно для файлов и папок
-        if (openBtn) openBtn.disabled = !hasSelection;
-        
-        // Редактировать - только для файлов
-        if (editBtn) editBtn.disabled = !isFile;
-        
-        // Остальные кнопки
-        if (renameBtn) renameBtn.disabled = !hasSelection;
-        if (copyBtn) copyBtn.disabled = !hasSelection;
-        if (pasteBtn) pasteBtn.disabled = !hasClipboard;
-        if (deleteBtn) deleteBtn.disabled = !hasSelection;
+        this.selectedRow = row;
+        this.selectedItem = item;
+        row.style.background = 'var(--win95-blue)';
+        row.style.color = '#fff';
+        this.updateButtons();
+        this.showStatus(`${item.name}${item.readonly ? ' [только чтение]' : ''}`);
     }
 
-    showContextMenu(x, y) {
-        const menu = document.getElementById('explorer-context-menu');
-        if (!menu) return;
-        
-        menu.style.display = 'block';
-        menu.style.left = x + 'px';
-        menu.style.top = y + 'px';
-        
-        // Обновить доступность пунктов
-        const pasteItem = menu.querySelector('[data-action="paste"]');
-        if (pasteItem) {
-            pasteItem.style.color = this.clipboard ? '' : '#808080';
-            pasteItem.style.pointerEvents = this.clipboard ? 'auto' : 'none';
-        }
-        
-        const editItem = menu.querySelector('[data-action="edit"]');
-        if (editItem && this.selectedItemData) {
-            editItem.style.display = this.selectedItemData.isDir ? 'none' : 'block';
+    updateButtons() {
+        const selected = Boolean(this.selectedItem);
+        this.element('open').disabled = !selected;
+        this.element('edit').disabled = !selected || this.selectedItem.type === 'dir' || this.selectedItem.readonly;
+        this.element('rename').disabled = !selected || this.selectedItem.readonly;
+        this.element('copy').disabled = !selected;
+        this.element('delete').disabled = !selected || this.selectedItem.readonly;
+        this.element('paste').disabled = !this.clipboard;
+    }
+
+    quote(value) {
+        return `"${String(value).replace(/"/g, '')}"`;
+    }
+
+    async openDirectory(name) {
+        try {
+            await this.requestCommand(`CD ${this.quote(name)}`);
+            await this.loadDirectory();
+        } catch (error) {
+            this.showStatus(error.message);
         }
     }
 
-    hideContextMenu() {
-        const menu = document.getElementById('explorer-context-menu');
-        if (menu) {
-            menu.style.display = 'none';
-        }
-    }
-
-    async handleContextAction(action) {
-        if (!this.selectedItemData && action !== 'paste') return;
-        
-        switch(action) {
-            case 'open':
-                if (this.selectedItemData.isDir) {
-                    await this.openDirectory(this.selectedItemData.name);
-                } else {
-                    await this.openFile(this.selectedItemData.name);
-                }
-                break;
-            case 'edit':
-                await this.editFile(this.selectedItemData.name);
-                break;
-            case 'rename':
-                await this.renameItem(this.selectedItemData.name);
-                break;
-            case 'copy':
-                this.copyItem(this.selectedItemData.name);
-                break;
-            case 'paste':
-                await this.pasteItem();
-                break;
-            case 'delete':
-                await this.deleteItem(this.selectedItemData.name, this.selectedItemData.isDir);
-                break;
+    async goUp() {
+        try {
+            await this.requestCommand('CD ..');
+            await this.loadDirectory();
+        } catch (error) {
+            this.showStatus(error.message);
         }
     }
 
     async createNewFile() {
-        const fileName = prompt('Введите имя файла:', 'newfile.txt');
-        if (!fileName) return;
-        
+        const name = prompt('Введите имя файла:', 'newfile.txt');
+        if (!name) return;
         try {
-            const response = await fetch('/api/file', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    action: 'create',
-                    path: fileName,
-                    content: '',
-                    sessionId: this.sessionId
-                })
-            });
-            
-            const result = await response.json();
-            if (result.success) {
-                this.showStatus(`Файл ${fileName} создан`);
-                await this.loadDirectory();
-            } else {
-                alert('Ошибка создания файла: ' + result.message);
-            }
+            await this.requestFile('create', { path: name, content: '' });
+            await this.loadDirectory();
+            this.showStatus(`Файл ${name} создан`);
         } catch (error) {
-            alert('Ошибка: ' + error.message);
+            alert(`Ошибка создания файла: ${error.message}`);
         }
     }
 
     async createNewFolder() {
-        const folderName = prompt('Введите имя папки:', 'NewFolder');
-        if (!folderName) return;
-        
+        const name = prompt('Введите имя папки:', 'NewFolder');
+        if (!name) return;
         try {
-            const response = await fetch('/api/file', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    action: 'mkdir',
-                    path: folderName,
-                    sessionId: this.sessionId
-                })
-            });
-            
-            const result = await response.json();
-            if (result.success) {
-                this.showStatus(`Папка ${folderName} создана`);
-                await this.loadDirectory();
-            } else {
-                alert('Ошибка создания папки: ' + result.message);
-            }
+            await this.requestFile('mkdir', { path: name });
+            await this.loadDirectory();
+            this.showStatus(`Папка ${name} создана`);
         } catch (error) {
-            alert('Ошибка: ' + error.message);
+            alert(`Ошибка создания папки: ${error.message}`);
         }
     }
 
     async renameItem(oldName) {
         const newName = prompt(`Переименовать "${oldName}" в:`, oldName);
         if (!newName || newName === oldName) return;
-        
         try {
-            const response = await fetch('/api/file', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    action: 'rename',
-                    path: oldName,
-                    newPath: newName,
-                    sessionId: this.sessionId
-                })
-            });
-            
-            const result = await response.json();
-            if (result.success) {
-                this.showStatus(`Переименовано: ${oldName} → ${newName}`);
-                await this.loadDirectory();
-            } else {
-                alert('Ошибка переименования: ' + result.message);
-            }
+            await this.requestFile('rename', { path: oldName, newPath: newName });
+            await this.loadDirectory();
         } catch (error) {
-            alert('Ошибка: ' + error.message);
+            alert(`Ошибка переименования: ${error.message}`);
         }
     }
 
-    copyItem(name) {
-        // Сохранить полный путь к файлу
-        const fullPath = this.currentPath.endsWith('\\') ? 
-            this.currentPath + name : 
-            this.currentPath + '\\' + name;
-            
-        this.clipboard = {
-            name: name,
-            path: this.currentPath,
-            fullPath: fullPath,
-            isDir: this.selectedItemData.isDir
-        };
-        console.log('Copied to clipboard:', this.clipboard);
-        console.log('Full source path:', fullPath);
-        this.showStatus(`Скопировано в буфер: ${name}`);
-        this.updateActionButtons();
+    copyItem() {
+        if (!this.selectedItem) return;
+        const separator = this.currentPath.endsWith('\\') ? '' : '\\';
+        this.clipboard = { ...this.selectedItem, fullPath: `${this.currentPath}${separator}${this.selectedItem.name}` };
+        this.updateButtons();
+        this.showStatus(`Скопировано в буфер: ${this.selectedItem.name}`);
     }
 
     async pasteItem() {
-        if (!this.clipboard) {
-            alert('Буфер обмена пуст');
-            return;
-        }
-        
-        console.log('Starting paste from clipboard:', this.clipboard);
-        
+        if (!this.clipboard) return;
         let newName = prompt(`Вставить "${this.clipboard.name}" как:`, this.clipboard.name);
-        if (!newName) {
-            console.log('Paste cancelled by user');
-            return;
-        }
-        
-        // Если имя не изменилось, добавить "Копия_"
-        if (newName === this.clipboard.name) {
-            newName = `Копия_${newName}`;
-            console.log('Same name, adding prefix:', newName);
-        }
-        
+        if (!newName) return;
+        if (newName === this.clipboard.name) newName = `КОПИЯ_${newName}`;
         try {
-            // Использовать полный путь источника из буфера
-            const sourcePath = this.clipboard.fullPath || (this.clipboard.path + this.clipboard.name);
-            
-            // Экранировать пути, если содержат пробелы
-            const sourcePathQuoted = sourcePath.includes(' ') ? `"${sourcePath}"` : sourcePath;
-            const destName = newName.includes(' ') ? `"${newName}"` : newName;
-            
-            const command = `COPY ${sourcePathQuoted} ${destName}`;
-            console.log('Source full path:', sourcePath);
-            console.log('Destination name:', newName);
-            console.log('Executing command:', command);
-            console.log('Current directory:', this.currentPath);
-            console.log('Session ID:', this.sessionId);
-            
-            // Использовать команду COPY для копирования
-            const response = await fetch('/api/command', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    command: command,
-                    sessionId: this.sessionId
-                })
-            });
-            
-            const result = await response.json();
-            
-            console.log('Server response:', result);
-            console.log('Response success:', result.success);
-            console.log('Response output:', result.output);
-            console.log('Response currentDir:', result.currentDir);
-            
-            // ВАЖНО: Проверяем output на наличие ошибок, а не только success!
-            const hasError = result.output && (
-                result.output.includes('не найден') ||
-                result.output.includes('Ошибка') ||
-                result.output.includes('ERROR')
-            );
-            
-            if (result.success && !hasError && result.output && result.output.includes('Скопировано')) {
-                console.log('✅ Paste successful!');
-                this.showStatus(`Вставлено: ${newName}`);
-                this.clipboard = null; // Очистить буфер после вставки
-                this.updateActionButtons();
-                await this.loadDirectory();
-            } else {
-                const errorMsg = result.output || result.error || 'Неизвестная ошибка';
-                console.error('❌ Paste failed:', errorMsg);
-                alert('Ошибка вставки:\n' + errorMsg);
-            }
+            await this.requestFile('copy', { path: this.clipboard.fullPath, newPath: newName });
+            this.clipboard = null;
+            await this.loadDirectory();
         } catch (error) {
-            console.error('❌ Paste exception:', error);
-            alert('Ошибка сети: ' + error.message);
+            alert(`Ошибка вставки: ${error.message}`);
         }
     }
 
-    async deleteItem(name, isDir) {
-        if (!confirm(`Удалить "${name}"?`)) return;
-        
+    async deleteItem() {
+        if (!this.selectedItem || !confirm(`Удалить "${this.selectedItem.name}"?`)) return;
         try {
-            // Использовать правильные DOS команды
-            const command = isDir ? `RMDIR /S ${name}` : `DEL ${name}`;
-            
-            const response = await fetch('/api/command', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    command: command,
-                    sessionId: this.sessionId
-                })
-            });
-            
-            const result = await response.json();
-            if (result.success) {
-                this.showStatus(`Удалено: ${name}`);
-                this.selectedItem = null;
-                this.selectedItemData = null;
-                this.updateActionButtons();
-                await this.loadDirectory();
-            } else {
-                alert('Ошибка удаления: ' + (result.output || result.error || 'Неизвестная ошибка'));
-            }
+            const action = this.selectedItem.type === 'dir' ? 'rmdir' : 'delete';
+            await this.requestFile(action, { path: this.selectedItem.name, recursive: true });
+            await this.loadDirectory();
         } catch (error) {
-            alert('Ошибка: ' + error.message);
+            alert(`Ошибка удаления: ${error.message}`);
         }
     }
 
-    async openDirectory(dirName) {
-        try {
-            const response = await fetch('/api/command', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    command: `CD ${dirName}`,
-                    sessionId: this.sessionId
-                })
-            });
-
-            const result = await response.json();
-            if (result.success) {
-                await this.loadDirectory();
-            }
-        } catch (error) {
-            this.showStatus('Ошибка открытия папки');
-        }
+    openSelected() {
+        if (!this.selectedItem) return;
+        return this.selectedItem.type === 'dir'
+            ? this.openDirectory(this.selectedItem.name)
+            : this.openFile(this.selectedItem.name);
     }
 
     async openFile(fileName) {
         try {
-            const response = await fetch('/api/command', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    command: `TYPE ${fileName}`,
-                    sessionId: this.sessionId
-                })
-            });
-
-            const result = await response.json();
-            if (result.success && result.output) {
-                this.showFileContent(fileName, result.output, false);
-            }
+            const result = await this.requestFile('read', { path: fileName });
+            this.showFileContent(fileName, result.content, false);
         } catch (error) {
-            this.showStatus('Ошибка открытия файла');
+            this.showStatus(error.message);
         }
     }
 
     async editFile(fileName) {
         try {
-            const response = await fetch('/api/command', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    command: `TYPE ${fileName}`,
-                    sessionId: this.sessionId
-                })
-            });
-
-            const result = await response.json();
-            if (result.success && result.output) {
-                this.showFileContent(fileName, result.output, true);
-            }
+            const result = await this.requestFile('read', { path: fileName });
+            this.showFileContent(fileName, result.content, true);
         } catch (error) {
-            this.showStatus('Ошибка открытия файла');
+            this.showStatus(error.message);
         }
     }
 
     showFileContent(fileName, content, editable) {
-        const windowId = 'file-' + Date.now();
-        const editorId = 'editor-' + Date.now(); // Уникальный ID для каждого редактора
-        
-        const win = win95Manager.createWindow(
-            windowId,
-            (editable ? 'Редактирование: ' : '') + fileName,
-            '📄',
-            600,
-            450
-        );
+        const id = `file-${globalThis.crypto?.randomUUID?.() || Date.now()}`;
+        const win = win95Manager.createWindow(id, `${editable ? 'Редактирование: ' : ''}${fileName}`, '📄', 600, 450);
+        const container = document.createElement('div');
+        container.style.cssText = 'height:100%;display:flex;flex-direction:column';
+        const panel = document.createElement('div');
+        panel.className = 'win95-inset-panel';
+        panel.style.cssText = 'flex:1;overflow:auto;margin:4px;background:#fff';
+        const viewer = document.createElement(editable ? 'textarea' : 'pre');
+        viewer.style.cssText = 'box-sizing:border-box;width:100%;height:100%;margin:0;padding:8px;border:0;color:#000;background:#fff;font:11px "Courier New",monospace;white-space:pre-wrap';
+        if (editable) viewer.value = content;
+        else viewer.textContent = content;
+        panel.appendChild(viewer);
 
-        // Экранировать HTML в содержимом
-        const escapeHtml = (text) => {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        };
-
-        const textarea = editable ? 
-            `<textarea id="${editorId}" style="width: 100%; height: 100%; border: none; font-family: 'Courier New', monospace; font-size: 11px; resize: none; padding: 8px; color: #000000; background: white;">${escapeHtml(content)}</textarea>` :
-            `<pre style="margin: 8px; font-family: 'Courier New', monospace; font-size: 11px; white-space: pre-wrap; color: #000000;">${escapeHtml(content)}</pre>`;
-
-        win.querySelector('.win95-window-content').innerHTML = `
-            <div style="height: 100%; display: flex; flex-direction: column;">
-                <div class="win95-inset-panel" style="flex: 1; overflow: auto; margin: 4px; background: white;">
-                    ${textarea}
-                </div>
-                <div style="padding: 4px; text-align: center; display: flex; gap: 4px; justify-content: center;">
-                    ${editable ? `<button class="win95-button" onclick="window.saveFileContent('${fileName}', '${editorId}', '${windowId}', '${this.sessionId}')">Сохранить</button>` : ''}
-                    <button class="win95-button" onclick="win95Manager.handleWindowAction('${windowId}', 'close')">Закрыть</button>
-                </div>
-            </div>
-        `;
-    }
-
-    async goUp() {
-        try {
-            const response = await fetch('/api/command', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    command: 'CD ..',
-                    sessionId: this.sessionId
-                })
+        const actions = document.createElement('div');
+        actions.style.cssText = 'padding:4px;text-align:center;display:flex;gap:4px;justify-content:center';
+        if (editable) {
+            const saveButton = document.createElement('button');
+            saveButton.className = 'win95-button';
+            saveButton.textContent = 'Сохранить';
+            saveButton.addEventListener('click', async () => {
+                try {
+                    await this.requestFile('write', { path: fileName, content: viewer.value });
+                    win95Manager.handleWindowAction(id, 'close');
+                    await this.loadDirectory();
+                } catch (error) {
+                    alert(`Ошибка сохранения: ${error.message}`);
+                }
             });
-
-            const result = await response.json();
-            if (result.success) {
-                await this.loadDirectory();
-            }
-        } catch (error) {
-            this.showStatus('Ошибка навигации');
+            actions.appendChild(saveButton);
         }
-    }
-
-    updatePathDisplay() {
-        const pathElement = document.getElementById(`explorer-path-${this.uniqueId}`);
-        if (pathElement) {
-            pathElement.textContent = this.currentPath;
-        }
-
-        const windowElement = document.getElementById(this.windowId);
-        if (windowElement) {
-            const titleText = windowElement.querySelector('.win95-title-bar-text');
-            if (titleText) {
-                titleText.textContent = `Проводник - ${this.currentPath}`;
-            }
-        }
+        const closeButton = document.createElement('button');
+        closeButton.className = 'win95-button';
+        closeButton.textContent = 'Закрыть';
+        closeButton.addEventListener('click', () => win95Manager.handleWindowAction(id, 'close'));
+        actions.appendChild(closeButton);
+        container.append(panel, actions);
+        win.querySelector('.win95-window-content').replaceChildren(container);
     }
 
     showStatus(message) {
-        const statusElement = document.getElementById(`explorer-status-${this.uniqueId}`);
-        if (statusElement) {
-            statusElement.textContent = message;
-        }
+        const status = this.element('status');
+        if (status) status.textContent = message;
     }
 }
 
-// Global function to save file content
-window.saveFileContent = async function(fileName, editorId, windowId, explorerSessionId) {
-    const editor = document.getElementById(editorId);
-    if (!editor) {
-        alert('Редактор не найден: ' + editorId);
-        return;
-    }
-    
-    const content = editor.value;
-    
-    console.log('Saving file:', fileName);
-    console.log('Using editor ID:', editorId);
-    console.log('Window ID:', windowId);
-    console.log('Content length:', content.length);
-    
-    try {
-        // Использовать команду ECHO для сохранения
-        const response = await fetch('/api/command', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                command: `ECHO . > ${fileName}`,
-                sessionId: explorerSessionId || 'file_save_' + Date.now()
-            })
-        });
-        
-        // Затем записать реальное содержимое
-        const lines = content.split('\n');
-        for (let i = 0; i < lines.length; i++) {
-            await fetch('/api/command', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    command: i === 0 ? `ECHO ${lines[i]} > ${fileName}` : `ECHO ${lines[i]} >> ${fileName}`,
-                    sessionId: explorerSessionId || 'file_save_' + Date.now()
-                })
-            });
-        }
-        
-        alert('Файл сохранён!');
-        win95Manager.handleWindowAction(windowId, 'close');
-        
-        // Обновить проводник
-        if (window.currentExplorer) {
-            await window.currentExplorer.loadDirectory();
-        }
-    } catch (error) {
-        alert('Ошибка сохранения: ' + error.message);
-    }
-};
-
-// Global Map to store multiple explorer instances
-if (!window.explorerInstances) {
-    window.explorerInstances = new Map();
-}
-
-// Global function to create and open explorer
-window.openEnhancedFileExplorer = function() {
-    const windowId = 'explorer-window-' + Date.now();
-    const win = win95Manager.createWindow(
-        windowId,
-        'Проводник - C:\\',
-        '📂',
-        700,
-        500
-    );
-
+window.explorerInstances = window.explorerInstances || new Map();
+window.openEnhancedFileExplorer = function openEnhancedFileExplorer() {
+    const unique = globalThis.crypto?.randomUUID?.() || Date.now();
+    const windowId = `explorer-window-${unique}`;
+    win95Manager.createWindow(windowId, 'Проводник - C:\\', '📂', 700, 500);
     const explorer = new EnhancedFileExplorer(windowId);
-    explorer.init();
-    
-    // Сохранить экземпляр в Map
     window.explorerInstances.set(windowId, explorer);
-    
-    // Для обратной совместимости
     window.currentExplorer = explorer;
+    explorer.init();
 };
-

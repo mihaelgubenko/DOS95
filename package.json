@@ -1,23 +1,48 @@
 {
-  "name": "dos-web-system",
-  "version": "1.0.0",
-  "description": "DOS-подобная система с веб-интерфейсом и AI-психотерапевтом",
+  "name": "dos95",
+  "version": "1.1.0",
+  "description": "DOS-подобная система с интерфейсом Windows 95 и ELIZA",
+  "private": true,
   "main": "server.js",
+  "bin": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "lint": "eslint .",
+    "test": "node --test \"test/unit/**/*.test.js\" \"test/integration/**/*.test.js\"",
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-lines=85 --test-coverage-functions=85 --test-coverage-branches=75 \"test/unit/**/*.test.js\" \"test/integration/**/*.test.js\"",
+    "test:setup": "playwright install chromium",
+    "test:e2e": "playwright test",
+    "verify": "npm run lint && npm run test:coverage && npm run test:e2e",
+    "build:win": "pkg . --sea --target node24-win-x64 --compress Brotli --output dist/DOS95.exe && node scripts/checksum.js",
+    "smoke:exe": "node scripts/smoke-exe.js",
+    "release:check": "npm run verify && npm audit && npm run build:win && npm run smoke:exe"
   },
-  "keywords": ["dos", "terminal", "web", "ai", "eliza"],
-  "author": "",
+  "engines": {
+    "node": ">=24 <25",
+    "npm": ">=11 <12"
+  },
+  "packageManager": "npm@11.6.2",
+  "keywords": ["dos", "windows95", "terminal", "web", "eliza"],
   "license": "MIT",
   "dependencies": {
-    "express": "^4.18.2",
-    "dotenv": "^16.3.1",
-    "openai": "^4.20.1",
-    "cors": "^2.8.5"
+    "dotenv": "16.6.1",
+    "express": "4.22.2",
+    "express-rate-limit": "8.6.2",
+    "helmet": "8.3.0",
+    "openai": "7.4.0"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1"
+    "@playwright/test": "1.62.1",
+    "@yao-pkg/pkg": "6.22.0",
+    "eslint": "10.8.1",
+    "nodemon": "3.1.14"
+  },
+  "pkg": {
+    "assets": ["public/**/*"],
+    "targets": ["node24-win-x64"],
+    "outputPath": "dist",
+    "sea": true,
+    "compress": "Brotli"
   }
 }
-

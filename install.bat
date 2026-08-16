@@ -1,9 +1,9 @@
 @echo off
 chcp 65001 >nul
-title DOS Web System - Installation
+title DOS95 - Installation
 
 echo ╔════════════════════════════════════════════════════════════╗
-echo ║                 DOS Web System v1.0                        ║
+echo ║                       DOS95 v1.1.0                         ║
 echo ║           Installation and Configuration                   ║
 echo ╚════════════════════════════════════════════════════════════╝
 echo.
@@ -54,7 +54,7 @@ echo ┌────────────────────────
 echo │ IMPORTANT: OpenAI API Setup (optional)                     │
 echo ├────────────────────────────────────────────────────────────┤
 echo │                                                            │
-echo │ To use the DOCTOR command with GPT-4O:                    │
+echo │ To use the protected DOCTOR command with OpenAI:          │
 echo │                                                            │
 echo │ 1. Open the .env file in a text editor                    │
 echo │ 2. Add your OpenAI API key:                               │
@@ -63,7 +63,7 @@ echo │                                                            │
 echo │ Get your key at: https://platform.openai.com/api-keys     │
 echo │                                                            │
 echo │ Without an API key, DOCTOR will work as classic           │
-echo │ ELIZA without GPT-4O                                       │
+echo │ ELIZA without OpenAI                                       │
 echo │                                                            │
 echo └────────────────────────────────────────────────────────────┘
 echo.
