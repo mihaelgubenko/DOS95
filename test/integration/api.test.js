@@ -39,13 +39,18 @@ before(async () => {
 after(() => new Promise((resolve) => server.close(resolve)));
 
 describe('HTTP API', () => {
-  it('serves health and the Windows 95 application', async () => {
+  it('serves health, boots into DOS and keeps Windows 95 directly addressable', async () => {
     const health = await request('/api/health');
     assert.equal(health.response.status, 200);
     assert.equal(health.json.status, 'ok');
     const page = await fetch(`${baseUrl}/`);
     assert.equal(page.status, 200);
-    assert.match(await page.text(), /Windows 95/);
+    const dosHtml = await page.text();
+    assert.match(dosHtml, /DOS95 v1\.1\.0/);
+    assert.doesNotMatch(dosHtml, /win95-desktop/);
+    const windowsPage = await fetch(`${baseUrl}/win95`);
+    assert.equal(windowsPage.status, 200);
+    assert.match(await windowsPage.text(), /Windows 95/);
     assert.match(page.headers.get('content-security-policy'), /script-src 'self'/);
     assert.equal(page.headers.get('x-content-type-options'), 'nosniff');
   });

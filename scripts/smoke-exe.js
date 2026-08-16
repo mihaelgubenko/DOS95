@@ -66,6 +66,11 @@ async function main() {
 
   const health = await waitForHealth();
   assert.equal(health.status, 'ok');
+  const dosPage = await fetch(`${baseUrl}/`).then((response) => response.text());
+  assert.match(dosPage, /DOS95 v1\.1\.0/);
+  assert.doesNotMatch(dosPage, /win95-desktop/);
+  const windowsPage = await fetch(`${baseUrl}/win95`).then((response) => response.text());
+  assert.match(windowsPage, /Windows 95/);
   const denied = await jsonRequest('/api/command', { command: 'DIR', sessionId: 'denied' }, {}, false);
   assert.equal(denied.response.status, 403);
   const bootstrap = await fetch(`${baseUrl}/api/bootstrap`).then((response) => response.json());

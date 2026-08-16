@@ -2,8 +2,33 @@
 
 const { test, expect } = require('@playwright/test');
 
-test('terminal and Explorer preserve exact file contents', async ({ page }) => {
+test('application boots into DOS and WIN95 opens the desktop in the same tab', async ({ page }) => {
   await page.goto('/');
+  await expect(page).toHaveTitle(/^DOS95/);
+  await expect(page.locator('.win95-desktop')).toHaveCount(0);
+
+  const commandInput = page.locator('#command-input');
+  const writeResponse = page.waitForResponse((response) => response.url().endsWith('/api/command')
+    && response.request().postData()?.includes('BOOTFLOW.TXT'));
+  await commandInput.fill('ECHO Создано в DOS > BOOTFLOW.TXT');
+  await commandInput.press('Enter');
+  expect((await writeResponse).ok()).toBe(true);
+
+  await commandInput.fill('WIN95');
+  await Promise.all([
+    page.waitForURL('**/win95'),
+    commandInput.press('Enter')
+  ]);
+  await expect(page).toHaveTitle(/Windows 95/);
+  await expect(page.locator('.win95-desktop')).toBeVisible();
+
+  await page.locator('.win95-desktop-icon[data-action="open-explorer"]').dblclick();
+  const explorer = page.locator('.win95-window').filter({ hasText: 'Проводник - C:\\' }).last();
+  await expect(explorer.getByText('BOOTFLOW.TXT')).toBeVisible();
+});
+
+test('terminal and Explorer preserve exact file contents', async ({ page }) => {
+  await page.goto('/win95');
   await expect(page).toHaveTitle(/Windows 95/);
 
   const commandInput = page.locator('#command-input');

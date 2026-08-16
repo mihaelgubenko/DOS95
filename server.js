@@ -296,7 +296,7 @@ function createApp(options = {}) {
   });
 
   const sendPage = (fileName) => (req, res) => res.sendFile(path.join(__dirname, 'public', fileName));
-  app.get('/', sendPage('win95.html'));
+  app.get('/', sendPage('index.html'));
   app.get(['/win95', '/win95.html'], sendPage('win95.html'));
   app.get(['/dos', '/index.html'], sendPage('index.html'));
 

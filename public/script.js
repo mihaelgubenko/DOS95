@@ -1,4 +1,5 @@
 // DOS95 - Client Side Script
+let allowInternalNavigation = false;
 
 class DOSTerminal {
     constructor() {
@@ -152,7 +153,10 @@ class DOSTerminal {
             }
 
             if (result.doctorMode !== undefined) this.setDoctorMode(result.doctorMode);
-            if (result.openWindow) window.open(result.openWindow, '_blank');
+            if (result.openWindow) {
+                allowInternalNavigation = true;
+                window.location.assign(result.openWindow);
+            }
         } catch (error) {
             console.error('Terminal rendering error:', error);
             this.appendToOutput('Ошибка интерфейса терминала. Обновите страницу.\n', 'error-output');
@@ -204,6 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Предотвратить случайное закрытие страницы
 window.addEventListener('beforeunload', (e) => {
+    if (allowInternalNavigation) return;
     e.preventDefault();
     e.returnValue = '';
 });
