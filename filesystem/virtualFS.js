@@ -1,271 +1,269 @@
-// Виртуальная файловая система
-class VirtualFileSystem {
-  constructor() {
-    this.fs = {
-      'C:\\': {
-        type: 'dir',
-        contents: {
-          'DOS': {
-            type: 'dir',
-            contents: {
-              'COMMAND.COM': { type: 'file', content: 'MS-DOS Command Interpreter', readonly: true },
-              'FORMAT.COM': { type: 'file', content: 'Disk Format Utility', readonly: true },
-              'FDISK.EXE': { type: 'file', content: 'Fixed Disk Setup Program', readonly: true }
-            }
-          },
-          'WINDOWS': {
-            type: 'dir',
-            contents: {
-              'SYSTEM': {
-                type: 'dir',
-                contents: {
-                  'CONFIG.SYS': { type: 'file', content: 'DEVICE=C:\\DOS\\HIMEM.SYS\nFILES=30\nBUFFERS=20' }
-                }
-              },
-              'WIN.COM': { type: 'file', content: 'Windows Loader', readonly: true }
-            }
-          },
-          'TEMP': {
-            type: 'dir',
-            contents: {}
-          },
-          'AUTOEXEC.BAT': {
-            type: 'file',
-            content: '@ECHO OFF\nPROMPT $P$G\nPATH C:\\DOS;C:\\WINDOWS\nECHO Welcome to DOS Web System v1.0\nECHO Type HELP for available commands'
-          },
-          'README.TXT': {
-            type: 'file',
-            content: 'DOS Web System v1.0\n==================\n\nДобро пожаловать в виртуальную DOS систему!\n\nОсновные команды:\n- DIR - список файлов\n- CD - смена каталога\n- TYPE - просмотр файла\n- HELP - справка\n- DOCTOR - AI психотерапевт\n\nИспользуйте HELP для полного списка команд.'
+'use strict';
+
+function createInitialState() {
+  return {
+    'C:\\': {
+      type: 'dir',
+      contents: {
+        DOS: {
+          type: 'dir',
+          contents: {
+            'COMMAND.COM': { type: 'file', content: 'MS-DOS Command Interpreter', readonly: true },
+            'FORMAT.COM': { type: 'file', content: 'Disk Format Utility', readonly: true },
+            'FDISK.EXE': { type: 'file', content: 'Fixed Disk Setup Program', readonly: true }
           }
+        },
+        WINDOWS: {
+          type: 'dir',
+          contents: {
+            SYSTEM: {
+              type: 'dir',
+              contents: {
+                'CONFIG.SYS': { type: 'file', content: 'DEVICE=C:\\DOS\\HIMEM.SYS\nFILES=30\nBUFFERS=20' }
+              }
+            },
+            'WIN.COM': { type: 'file', content: 'Windows Loader', readonly: true }
+          }
+        },
+        TEMP: { type: 'dir', contents: {} },
+        'AUTOEXEC.BAT': {
+          type: 'file',
+          content: '@ECHO OFF\nPROMPT $P$G\nPATH C:\\DOS;C:\\WINDOWS\nECHO Welcome to DOS95 v1.1.0\nECHO Type HELP for available commands'
+        },
+        'README.TXT': {
+          type: 'file',
+          content: 'DOS95 v1.1.0\n=============\n\nДобро пожаловать в виртуальную DOS-систему!\n\nОсновные команды:\n- DIR - список файлов\n- CD - смена каталога\n- TYPE - просмотр файла\n- HELP - справка\n- DOCTOR - защищённый виртуальный собеседник\n\nИспользуйте HELP для полного списка команд.'
         }
       }
-    };
+    }
+  };
+}
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function isValidNode(node) {
+  if (!node || typeof node !== 'object') return false;
+  if (node.type === 'file') return typeof node.content === 'string';
+  if (node.type !== 'dir' || !node.contents || typeof node.contents !== 'object') return false;
+  return Object.entries(node.contents).every(([name, child]) => name && isValidNode(child));
+}
+
+class VirtualFileSystem {
+  constructor({ state, onChange } = {}) {
+    const candidate = state ? clone(state) : createInitialState();
+    if (!candidate['C:\\'] || !isValidNode(candidate['C:\\'])) {
+      throw new Error('Некорректное состояние виртуальной файловой системы');
+    }
+    this.fs = candidate;
+    this.onChange = typeof onChange === 'function' ? onChange : null;
   }
 
-  // Нормализация пути
-  normalizePath(currentDir, targetPath) {
-    if (!targetPath || targetPath === '.') {
-      return currentDir;
+  static createInitialState() {
+    return createInitialState();
+  }
+
+  toJSON() {
+    return clone(this.fs);
+  }
+
+  normalizePath(currentDir = 'C:\\', targetPath = '.') {
+    if (typeof currentDir !== 'string' || typeof targetPath !== 'string') {
+      throw new TypeError('Путь должен быть строкой');
     }
 
-    // Корень диска: \ или /
-    if (targetPath === '\\' || targetPath === '/') {
-      return 'C:\\';
+    let target = targetPath.trim();
+    if (target.length >= 2 && target.startsWith('"') && target.endsWith('"')) {
+      target = target.slice(1, -1);
+    }
+    target = target.replace(/\//g, '\\');
+
+    if (!target || target === '.') return this.normalizePath('C:\\', currentDir);
+    if (/^[A-Z]:$/i.test(target)) target += '\\';
+    if (/^[A-Z]:/i.test(target) && !/^C:/i.test(target)) {
+      throw new Error('Поддерживается только диск C:');
     }
 
-    // Абсолютный путь C:\ или C:/
-    if (targetPath.match(/^[A-Z]:[\\\/]/i)) {
-      let normalized = targetPath.toUpperCase().replace(/\//g, '\\');
-      // Убрать лишние слеши в конце (кроме корня)
-      if (normalized.length > 3 && normalized.endsWith('\\')) {
-        normalized = normalized.slice(0, -1);
-      }
-      return normalized;
+    let parts;
+    if (target === '\\' || /^C:\\?$/i.test(target)) {
+      parts = [];
+    } else if (/^C:\\/i.test(target)) {
+      parts = target.slice(3).split('\\');
+    } else {
+      const base = currentDir.replace(/\//g, '\\');
+      if (!/^C:\\?/i.test(base)) throw new Error('Некорректный текущий каталог');
+      parts = base.replace(/^C:\\?/i, '').split('\\').filter(Boolean).concat(target.split('\\'));
     }
 
-    // Относительный путь
-    let path = currentDir;
-    const parts = targetPath.split(/[\\\/]/);  // Поддержка / и \
-
-    for (const part of parts) {
+    const normalized = [];
+    for (const rawPart of parts) {
+      const part = rawPart.trim();
+      if (!part || part === '.') continue;
       if (part === '..') {
-        // Вверх на один уровень
-        const lastSlash = path.lastIndexOf('\\');
-        if (lastSlash > 2) { // Не выше корня диска C:\
-          path = path.substring(0, lastSlash);
-        } else {
-          path = 'C:\\';  // Достигли корня
-        }
-      } else if (part && part !== '.') {
-        // Вниз на один уровень
-        if (!path.endsWith('\\')) path += '\\';
-        path += part.toUpperCase();
+        normalized.pop();
+        continue;
       }
+      this.validateName(part);
+      normalized.push(part.toUpperCase());
     }
-
-    return path;
+    return normalized.length ? `C:\\${normalized.join('\\')}` : 'C:\\';
   }
 
-  // Получить объект по пути
-  getNode(path) {
-    path = path.toUpperCase();
-    
-    // Специальная обработка корня диска
-    if (path === 'C:\\' || path === 'C:') {
-      return this.fs['C:\\'];
+  validateName(name) {
+    if (typeof name !== 'string' || !name || name !== name.trim()) {
+      throw new Error('Некорректное имя файла или каталога');
     }
-    
-    const parts = path.split('\\').filter(p => p);
-    
-    let current = this.fs['C:\\'];  // Начинаем с корня C:\
-    
-    for (const part of parts) {
-      // Пропускаем 'C:' если он в начале пути
-      if (part === 'C:') continue;
-      
-      if (!current.contents || !current.contents[part]) {
-        return null;
-      }
+    if (name === '.' || name === '..' || /[<>:"/\\|?*\x00-\x1f]/.test(name)) {
+      throw new Error(`Недопустимое имя: ${name}`);
+    }
+    if (/[. ]$/.test(name)) throw new Error(`Недопустимое имя: ${name}`);
+  }
+
+  getNode(targetPath) {
+    let normalized;
+    try {
+      normalized = this.normalizePath('C:\\', targetPath);
+    } catch {
+      return null;
+    }
+    if (normalized === 'C:\\') return this.fs['C:\\'];
+
+    let current = this.fs['C:\\'];
+    for (const part of normalized.slice(3).split('\\')) {
+      if (!current.contents || !current.contents[part]) return null;
       current = current.contents[part];
-      if (!current) return null;
     }
-    
     return current;
   }
 
-  // Проверить существование пути
-  exists(path) {
-    return this.getNode(path) !== null;
+  exists(targetPath) {
+    return this.getNode(targetPath) !== null;
   }
 
-  // Проверить, является ли путь директорией
-  isDirectory(path) {
-    const node = this.getNode(path);
-    return node && node.type === 'dir';
+  isDirectory(targetPath) {
+    return this.getNode(targetPath)?.type === 'dir';
   }
 
-  // Получить содержимое директории
-  listDirectory(path) {
-    const node = this.getNode(path);
-    if (!node || node.type !== 'dir') {
+  listDirectory(targetPath) {
+    const node = this.getNode(targetPath);
+    if (!node || node.type !== 'dir') return null;
+    return Object.entries(node.contents).map(([name, item]) => ({
+      name,
+      type: item.type,
+      size: item.type === 'file' ? Buffer.byteLength(item.content, 'utf8') : 0,
+      readonly: Boolean(item.readonly)
+    }));
+  }
+
+  readFile(targetPath) {
+    const node = this.getNode(targetPath);
+    return node?.type === 'file' ? node.content : null;
+  }
+
+  createDirectory(targetPath) {
+    const destination = this.#destination(targetPath);
+    if (!destination || destination.parent.contents[destination.name]) return false;
+    destination.parent.contents[destination.name] = { type: 'dir', contents: {} };
+    this.#changed();
+    return true;
+  }
+
+  writeFile(targetPath, content) {
+    const destination = this.#destination(targetPath);
+    if (!destination) return false;
+    const existing = destination.parent.contents[destination.name];
+    if (existing?.readonly || existing?.type === 'dir') return false;
+    destination.parent.contents[destination.name] = { type: 'file', content: String(content ?? '') };
+    this.#changed();
+    return true;
+  }
+
+  deleteFile(targetPath) {
+    const destination = this.#destination(targetPath);
+    if (!destination) return false;
+    const file = destination.parent.contents[destination.name];
+    if (!file || file.type !== 'file' || file.readonly) return false;
+    delete destination.parent.contents[destination.name];
+    this.#changed();
+    return true;
+  }
+
+  deleteDirectory(targetPath, { recursive = false } = {}) {
+    const normalized = this.normalizePath('C:\\', targetPath);
+    if (normalized === 'C:\\') return false;
+    const destination = this.#destination(normalized);
+    if (!destination) return false;
+    const directory = destination.parent.contents[destination.name];
+    if (!directory || directory.type !== 'dir') return false;
+    if (!recursive && Object.keys(directory.contents).length) return false;
+    if (recursive && this.#containsReadonly(directory)) return false;
+    delete destination.parent.contents[destination.name];
+    this.#changed();
+    return true;
+  }
+
+  copyFile(sourcePath, destinationPath) {
+    const source = this.getNode(sourcePath);
+    if (!source || source.type !== 'file') return false;
+    return this.writeFile(destinationPath, source.content);
+  }
+
+  copyNode(sourcePath, destinationPath) {
+    const source = this.getNode(sourcePath);
+    const destination = this.#destination(destinationPath);
+    if (!source || !destination || destination.parent.contents[destination.name]) return false;
+    destination.parent.contents[destination.name] = clone(source);
+    this.#changed();
+    return true;
+  }
+
+  moveFile(sourcePath, destinationPath) {
+    const source = this.getNode(sourcePath);
+    if (!source || source.type !== 'file') return false;
+    return this.moveNode(sourcePath, destinationPath);
+  }
+
+  moveNode(sourcePath, destinationPath) {
+    const source = this.normalizePath('C:\\', sourcePath);
+    const destination = this.normalizePath('C:\\', destinationPath);
+    if (source === 'C:\\' || source === destination || destination.startsWith(`${source}\\`)) return false;
+
+    const sourceRef = this.#destination(source);
+    const destinationRef = this.#destination(destination);
+    if (!sourceRef || !destinationRef) return false;
+    const node = sourceRef.parent.contents[sourceRef.name];
+    if (!node || node.readonly || destinationRef.parent.contents[destinationRef.name]?.readonly) return false;
+    if (destinationRef.parent.contents[destinationRef.name]) return false;
+
+    destinationRef.parent.contents[destinationRef.name] = node;
+    delete sourceRef.parent.contents[sourceRef.name];
+    this.#changed();
+    return true;
+  }
+
+  #destination(targetPath) {
+    let normalized;
+    try {
+      normalized = this.normalizePath('C:\\', targetPath);
+    } catch {
       return null;
     }
-
-    const items = [];
-    for (const [name, item] of Object.entries(node.contents || {})) {
-      items.push({
-        name,
-        type: item.type,
-        size: item.type === 'file' ? item.content.length : 0,
-        readonly: item.readonly || false
-      });
-    }
-
-    return items;
+    if (normalized === 'C:\\') return null;
+    const lastSlash = normalized.lastIndexOf('\\');
+    const parent = this.getNode(normalized.slice(0, lastSlash) || 'C:\\');
+    if (!parent || parent.type !== 'dir') return null;
+    return { parent, name: normalized.slice(lastSlash + 1) };
   }
 
-  // Прочитать файл
-  readFile(path) {
-    const node = this.getNode(path);
-    if (!node || node.type !== 'file') {
-      return null;
-    }
-    return node.content;
+  #containsReadonly(node) {
+    if (node.type === 'file') return Boolean(node.readonly);
+    return Object.values(node.contents).some((child) => this.#containsReadonly(child));
   }
 
-  // Создать директорию
-  createDirectory(path) {
-    const parentPath = path.substring(0, path.lastIndexOf('\\'));
-    const dirName = path.substring(path.lastIndexOf('\\') + 1);
-    
-    const parent = this.getNode(parentPath);
-    if (!parent || parent.type !== 'dir') {
-      return false;
-    }
-
-    if (parent.contents[dirName.toUpperCase()]) {
-      return false; // Уже существует
-    }
-
-    parent.contents[dirName.toUpperCase()] = {
-      type: 'dir',
-      contents: {}
-    };
-
-    return true;
-  }
-
-  // Создать или записать файл
-  writeFile(path, content) {
-    const parentPath = path.substring(0, path.lastIndexOf('\\'));
-    const fileName = path.substring(path.lastIndexOf('\\') + 1);
-    
-    const parent = this.getNode(parentPath);
-    if (!parent || parent.type !== 'dir') {
-      return false;
-    }
-
-    // Проверить readonly
-    if (parent.contents[fileName.toUpperCase()]?.readonly) {
-      return false;
-    }
-
-    parent.contents[fileName.toUpperCase()] = {
-      type: 'file',
-      content: content
-    };
-
-    return true;
-  }
-
-  // Удалить файл
-  deleteFile(path) {
-    const parentPath = path.substring(0, path.lastIndexOf('\\'));
-    const fileName = path.substring(path.lastIndexOf('\\') + 1);
-    
-    const parent = this.getNode(parentPath);
-    if (!parent || parent.type !== 'dir') {
-      return false;
-    }
-
-    const file = parent.contents[fileName.toUpperCase()];
-    if (!file || file.type !== 'file') {
-      return false;
-    }
-
-    if (file.readonly) {
-      return false;
-    }
-
-    delete parent.contents[fileName.toUpperCase()];
-    return true;
-  }
-
-  // Удалить директорию
-  deleteDirectory(path) {
-    const parentPath = path.substring(0, path.lastIndexOf('\\'));
-    const dirName = path.substring(path.lastIndexOf('\\') + 1);
-    
-    const parent = this.getNode(parentPath);
-    if (!parent || parent.type !== 'dir') {
-      return false;
-    }
-
-    const dir = parent.contents[dirName.toUpperCase()];
-    if (!dir || dir.type !== 'dir') {
-      return false;
-    }
-
-    // Проверить, что директория пуста
-    if (dir.contents && Object.keys(dir.contents).length > 0) {
-      return false;
-    }
-
-    delete parent.contents[dirName.toUpperCase()];
-    return true;
-  }
-
-  // Копировать файл
-  copyFile(sourcePath, destPath) {
-    const content = this.readFile(sourcePath);
-    if (content === null) {
-      return false;
-    }
-
-    return this.writeFile(destPath, content);
-  }
-
-  // Переместить/переименовать файл
-  moveFile(sourcePath, destPath) {
-    if (this.copyFile(sourcePath, destPath)) {
-      return this.deleteFile(sourcePath);
-    }
-    return false;
+  #changed() {
+    if (this.onChange) this.onChange(this.toJSON());
   }
 }
 
-// Singleton instance
-const vfs = new VirtualFileSystem();
-
-module.exports = vfs;
-
+module.exports = { VirtualFileSystem, createInitialState };

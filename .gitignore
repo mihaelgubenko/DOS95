@@ -2,5 +2,11 @@ node_modules/
 .env
 *.log
 .DS_Store
-package-lock.json
+.idea/
+dist/
+coverage/
+playwright-report/
+test-results/
+*.pfx
+*.p12
 

@@ -296,7 +296,7 @@ body {
 }
 
 .win95-window.active {
-  z-index: 9999;
+  box-shadow: 3px 3px 10px rgba(0, 0, 0, 0.45);
 }
 
 /* Window Title Bar */

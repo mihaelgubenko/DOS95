@@ -1,4 +1,7 @@
+'use strict';
+
 // Системные команды DOS
+const VERSION = require('../package.json').version;
 
 const fortunes = [
   'Самая большая ошибка, которую вы можете совершить в жизни, - это постоянный страх совершить ошибку.',
@@ -11,6 +14,58 @@ const fortunes = [
   'Любой дурак может написать код, который понимает компьютер. Хорошие программисты пишут код, который понимают люди.'
 ];
 
+function evaluateExpression(source) {
+  if (typeof source !== 'string' || !source.trim() || /[^0-9+\-*/().\s]/.test(source)) {
+    throw new Error('Недопустимое выражение');
+  }
+  const tokens = source.match(/\d+(?:\.\d+)?|[()+\-*/]/g) || [];
+  let position = 0;
+
+  const parsePrimary = () => {
+    const token = tokens[position];
+    if (token === '+' || token === '-') {
+      position += 1;
+      const value = parsePrimary();
+      return token === '-' ? -value : value;
+    }
+    if (token === '(') {
+      position += 1;
+      const value = parseAdditive();
+      if (tokens[position] !== ')') throw new Error('Незакрытая скобка');
+      position += 1;
+      return value;
+    }
+    if (!token || !/^\d/.test(token)) throw new Error('Ожидалось число');
+    position += 1;
+    return Number(token);
+  };
+
+  const parseMultiplicative = () => {
+    let value = parsePrimary();
+    while (tokens[position] === '*' || tokens[position] === '/') {
+      const operator = tokens[position++];
+      const right = parsePrimary();
+      if (operator === '/' && right === 0) throw new Error('Деление на ноль');
+      value = operator === '*' ? value * right : value / right;
+    }
+    return value;
+  };
+
+  const parseAdditive = () => {
+    let value = parseMultiplicative();
+    while (tokens[position] === '+' || tokens[position] === '-') {
+      const operator = tokens[position++];
+      const right = parseMultiplicative();
+      value = operator === '+' ? value + right : value - right;
+    }
+    return value;
+  };
+
+  const result = parseAdditive();
+  if (position !== tokens.length || !Number.isFinite(result)) throw new Error('Недопустимое выражение');
+  return result;
+}
+
 const systemCommands = {
   // CLS - очистка экрана
   cls: () => {
@@ -18,14 +73,14 @@ const systemCommands = {
   },
 
   // HELP - справка
-  help: (args, session) => {
+  help: (args, _session) => {
     if (args.length > 0) {
       const cmd = args[0].toUpperCase();
       const helpText = getCommandHelp(cmd);
       return { output: helpText };
     }
 
-    let output = `DOS Web System v1.0 - Справка по командам\n`;
+    let output = `DOS95 v${VERSION} - Справка по командам\n`;
     output += `${'='.repeat(50)}\n\n`;
     
     output += `ФАЙЛОВЫЕ КОМАНДЫ:\n`;
@@ -59,7 +114,7 @@ const systemCommands = {
     output += `  EXIT               - Выход\n\n`;
     
     output += `СПЕЦИАЛЬНЫЕ КОМАНДЫ:\n`;
-    output += `  DOCTOR             - AI психотерапевт (GPT-4O)\n`;
+    output += `  DOCTOR             - Защищённый виртуальный собеседник\n`;
     output += `  WIN95 / WIN        - Запустить Windows 95 интерфейс\n`;
     output += `  CALC <выражение>   - Калькулятор\n`;
     output += `  BANNER <текст>     - ASCII баннер\n`;
@@ -85,9 +140,9 @@ const systemCommands = {
   ver: () => {
     let output = `\n`;
     output += `╔════════════════════════════════════════════════╗\n`;
-    output += `║   DOS Web System Version 1.0.0                 ║\n`;
+    output += `║   DOS95 Version ${VERSION.padEnd(31, ' ')}║\n`;
     output += `║   Виртуальная DOS среда с AI интеграцией       ║\n`;
-    output += `║   (c) 2025 - Powered by GPT-4O                 ║\n`;
+    output += `║   (c) 2026 - Protected OpenAI integration      ║\n`;
     output += `╚════════════════════════════════════════════════╝\n`;
     output += `\n`;
     return { output };
@@ -192,12 +247,10 @@ const systemCommands = {
 
     try {
       const expression = args.join(' ');
-      // Безопасное вычисление (только базовые операции)
-      const sanitized = expression.replace(/[^0-9+\-*/().\s]/g, '');
-      const result = eval(sanitized);
+      const result = evaluateExpression(expression);
       return { output: `${expression} = ${result}\n` };
     } catch (error) {
-      return { output: `Ошибка вычисления\n` };
+      return { success: false, output: `Ошибка вычисления: ${error.message}\n` };
     }
   },
 
@@ -260,7 +313,7 @@ const systemCommands = {
     output += `\n`;
     output += `Открываю графический интерфейс Windows 95 в новом окне...\n`;
     output += `\n`;
-    output += `URL: http://localhost:${process.env.PORT || 3000}/win95\n`;
+    output += `URL: /win95\n`;
     output += `\n`;
     output += `Если окно не открылось автоматически, скопируйте ссылку выше.\n`;
     output += `\n`;
@@ -268,7 +321,7 @@ const systemCommands = {
     // Открыть в новом окне браузера (работает на клиенте)
     return { 
       output,
-      openWindow: 'http://localhost:' + (process.env.PORT || 3000) + '/win95'
+      openWindow: '/win95'
     };
   }
 };
@@ -375,7 +428,7 @@ function getCommandHelp(cmd) {
   CD\\            - перейти в C:\\
   CD C:\\DOS      - перейти в C:\\DOS`,
     'TYPE': 'TYPE <файл>\nВыводит содержимое текстового файла.',
-    'DOCTOR': 'DOCTOR\nЗапускает AI психотерапевта на базе GPT-4O.\nДля выхода введите QUIT.',
+    'DOCTOR': 'DOCTOR\nЗапускает защищённого виртуального собеседника. Это не врач.\nДля выхода введите QUIT.',
     'REDIRECT': `ПЕРЕНАПРАВЛЕНИЕ ВЫВОДА
 ==================
 
@@ -428,7 +481,7 @@ function getCommandHelp(cmd) {
   ECHO Ещё текст >> test.txt
   TYPE test.txt
 
-Для полного руководства см. REDIRECTION_GUIDE.md`,
+Для полного руководства см. docs/COMMANDS.md`,
     '>': 'См. HELP REDIRECT для справки по перенаправлению вывода.',
     '>>': 'См. HELP REDIRECT для справки по перенаправлению вывода.',
   };
@@ -437,4 +490,5 @@ function getCommandHelp(cmd) {
 }
 
 module.exports = systemCommands;
+module.exports.evaluateExpression = evaluateExpression;
 

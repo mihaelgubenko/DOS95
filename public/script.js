@@ -1,4 +1,4 @@
-// DOS Web System - Client Side Script
+// DOS95 - Client Side Script
 
 class DOSTerminal {
     constructor() {
@@ -39,7 +39,8 @@ class DOSTerminal {
     }
 
     generateSessionId() {
-        return 'session_' + Math.random().toString(36).substring(2, 11);
+        const id = globalThis.crypto?.randomUUID?.() || Math.random().toString(36).substring(2, 11);
+        return 'session_' + id;
     }
 
     updateTime() {
@@ -106,7 +107,7 @@ class DOSTerminal {
         }
 
         try {
-            const response = await fetch('/api/command', {
+            const response = await window.dos95Api.fetch('/api/command', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'

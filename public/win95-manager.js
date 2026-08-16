@@ -183,6 +183,7 @@ class Win95Manager {
         // Remove active class from all windows
         document.querySelectorAll('.win95-window').forEach(w => {
             w.classList.remove('active');
+            if (w.id !== windowId) w.style.zIndex = '1000';
         });
         
         const windowData = this.windows.get(windowId);
@@ -242,7 +243,6 @@ class Win95Manager {
     // ===== DRAGGING =====
     makeDraggable(windowElement, handle) {
         let isDragging = false;
-        let startX, startY;
         let offsetX, offsetY;
 
         handle.addEventListener('mousedown', (e) => {
@@ -347,10 +347,10 @@ class Win95Manager {
             }
             taskbarItem.dataset.window = windowId;
             
-            taskbarItem.innerHTML = `
-                <span class="win95-taskbar-item-icon">${icon}</span>
-                ${titleText}
-            `;
+            const iconElement = document.createElement('span');
+            iconElement.className = 'win95-taskbar-item-icon';
+            iconElement.textContent = icon;
+            taskbarItem.append(iconElement, document.createTextNode(titleText));
             
             taskbarItem.addEventListener('click', () => {
                 if (data.minimized) {
@@ -452,7 +452,7 @@ class Win95Manager {
             setTimeout(async () => {
                 if (window.currentExplorer) {
                     try {
-                        const response = await fetch('/api/command', {
+                        const response = await window.dos95Api.fetch('/api/command', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -476,8 +476,6 @@ class Win95Manager {
     createExplorerWindow() {
         if (typeof window.openEnhancedFileExplorer === 'function') {
             window.openEnhancedFileExplorer();
-        } else if (typeof window.openFileExplorer === 'function') {
-            window.openFileExplorer();
         } else {
             const win = this.createWindow('explorer-window', 'Проводник - C:\\', '📂', 600, 450);
             win.querySelector('.win95-window-content').innerHTML = `
@@ -491,7 +489,7 @@ class Win95Manager {
     }
 
     createDoctorWindow() {
-        const win = this.createWindow('doctor-window', 'ELIZA Psychotherapist', '🧠', 500, 450);
+        const win = this.createWindow('doctor-window', 'ELIZA — собеседник', '🧠', 500, 450);
         
         // Создать уникальный sessionId для этого окна ELIZA
         const doctorSessionId = 'doctor-session-' + Date.now();
@@ -511,7 +509,7 @@ class Win95Manager {
                     <input type="text" id="doctor-input" placeholder="Введите сообщение..." 
                            style="flex: 1; padding: 4px; font-family: 'MS Sans Serif', sans-serif; font-size: 11px; color: #000000;" 
                            class="win95-inset-panel">
-                    <button class="win95-button" onclick="win95Manager.sendDoctorMessage()">Отправить</button>
+                    <button class="win95-button" data-role="doctor-send">Отправить</button>
                 </div>
                 
                 <div style="padding: 4px; font-size: 10px; color: #000000;">
@@ -520,6 +518,8 @@ class Win95Manager {
             </div>
         `;
         
+        win.querySelector('[data-role="doctor-send"]').addEventListener('click', () => this.sendDoctorMessage());
+
         // Инициализировать DOCTOR сеанс
         setTimeout(async () => {
             await this.initDoctorSession(doctorSessionId);
@@ -539,7 +539,7 @@ class Win95Manager {
     async initDoctorSession(sessionId) {
         try {
             // Запустить DOCTOR сеанс
-            const response = await fetch('/api/command', {
+            const response = await window.dos95Api.fetch('/api/command', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -553,7 +553,7 @@ class Win95Manager {
             // Показать приветствие
             const chat = document.getElementById('doctor-chat');
             if (chat) {
-                let greeting = result.output || 'Здравствуйте. Я ваш AI психотерапевт.';
+                let greeting = result.output || 'Здравствуйте. Я виртуальный поддерживающий собеседник.';
                 
                 // Очистить от служебных элементов
                 greeting = greeting.replace(/╔[═]+╗/g, '');
@@ -563,11 +563,7 @@ class Win95Manager {
                 greeting = greeting.replace(/DOCTOR>/g, '');
                 greeting = greeting.trim();
                 
-                chat.innerHTML = `
-                    <div style="margin-bottom: 10px; padding: 8px; background: #ffffcc; border: 1px solid #ccc; color: #000000;">
-                        <strong style="color: #000000;">ELIZA:</strong> ${this.escapeHtml(greeting)}
-                    </div>
-                `;
+                chat.replaceChildren(this.createDoctorMessage('ELIZA:', greeting, false));
             }
         } catch (error) {
             console.error('Error initializing DOCTOR:', error);
@@ -588,10 +584,7 @@ class Win95Manager {
         const sessionId = doctorWindow ? doctorWindow.dataset.doctorSessionId : ('doctor-fallback-' + Date.now());
         
         // Добавить сообщение пользователя
-        const userMsg = document.createElement('div');
-        userMsg.style.cssText = 'margin-bottom: 10px; text-align: right;';
-        userMsg.innerHTML = `<div style="display: inline-block; padding: 8px; background: #e0e0ff; border: 1px solid #999; border-radius: 4px; max-width: 80%; word-wrap: break-word; color: #000000;"><strong style="color: #000000;">ВЫ:</strong> ${this.escapeHtml(message)}</div>`;
-        chat.appendChild(userMsg);
+        chat.appendChild(this.createDoctorMessage('ВЫ:', message, true));
         
         input.value = '';
         input.disabled = true;
@@ -601,7 +594,7 @@ class Win95Manager {
         
         try {
             // Отправить сообщение через уже запущенный сеанс DOCTOR
-            const response = await fetch('/api/command', {
+            const response = await window.dos95Api.fetch('/api/command', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -613,9 +606,6 @@ class Win95Manager {
             const result = await response.json();
             
             // Добавить ответ ELIZA
-            const aiMsg = document.createElement('div');
-            aiMsg.style.cssText = 'margin-bottom: 10px;';
-            
             let aiText = result.output || 'Ошибка получения ответа';
             
             // Убрать все служебные элементы
@@ -630,7 +620,6 @@ class Win95Manager {
             
             // Убрать технические сообщения
             aiText = aiText.replace(/\(Введите QUIT для выхода\)/g, '');
-            aiText = aiText.replace(/ELIZA - Виртуальный Психотерапевт/g, '');
             aiText = aiText.replace(/Классическая версия.*OpenAI.*недоступен.*/g, '');
             
             // Очистить от лишних пробелов и переносов
@@ -642,8 +631,7 @@ class Win95Manager {
                 aiText = 'Расскажите мне больше об этом.';
             }
             
-            aiMsg.innerHTML = `<div style="display: inline-block; padding: 8px; background: #ffffcc; border: 1px solid #ccc; border-radius: 4px; max-width: 80%; word-wrap: break-word; color: #000000;"><strong style="color: #000000;">ELIZA:</strong> ${this.escapeHtml(aiText)}</div>`;
-            chat.appendChild(aiMsg);
+            chat.appendChild(this.createDoctorMessage('ELIZA:', aiText, false));
             
             // Скролл вниз
             chat.scrollTop = chat.scrollHeight;
@@ -659,26 +647,38 @@ class Win95Manager {
         input.focus();
     }
     
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+    createDoctorMessage(label, text, fromUser) {
+        const row = document.createElement('div');
+        row.style.cssText = `margin-bottom: 10px;${fromUser ? ' text-align: right;' : ''}`;
+
+        const bubble = document.createElement('div');
+        bubble.style.cssText = `display: inline-block; padding: 8px; background: ${fromUser ? '#e0e0ff' : '#ffffcc'}; border: 1px solid ${fromUser ? '#999' : '#ccc'}; border-radius: 4px; max-width: 80%; word-wrap: break-word; white-space: pre-wrap; color: #000000;`;
+
+        const author = document.createElement('strong');
+        author.style.color = '#000000';
+        author.textContent = label;
+        bubble.append(author, document.createTextNode(` ${text}`));
+        row.appendChild(bubble);
+        return row;
     }
 
     createAboutWindow() {
         const win = this.createWindow('about-window', 'О системе', 'ℹ️', 400, 300);
         win.querySelector('.win95-window-content').innerHTML = `
             <div style="padding: 20px; text-align: center; color: #000000;">
-                <h2 style="color: #000000;">DOS Web System</h2>
+                <h2 style="color: #000000;">DOS95</h2>
                 <p style="color: #000000;"><strong>Windows 95 Edition</strong></p>
-                <p style="color: #000000;">Version 1.0.0</p>
+                <p style="color: #000000;">Version 1.1.0</p>
                 <hr style="margin: 20px 0; border-color: #808080;">
                 <p style="color: #000000;">Виртуальная DOS среда с интерфейсом Windows 95</p>
-                <p style="color: #000000;">AI интеграция: GPT-4O</p>
+                <p style="color: #000000;">AI интеграция: защищённая GPT-5.6</p>
                 <p style="margin-top: 20px; color: #000000;">© 2025 DOS95 Team</p>
-                <button class="win95-button" onclick="win95Manager.handleWindowAction('about-window', 'close')" style="margin-top: 20px;">OK</button>
+                <button class="win95-button" data-role="about-close" style="margin-top: 20px;">OK</button>
             </div>
         `;
+        win.querySelector('[data-role="about-close"]').addEventListener('click', () => {
+            this.handleWindowAction('about-window', 'close');
+        });
     }
 
     createWindow(id, title, icon, width, height) {
@@ -692,8 +692,8 @@ class Win95Manager {
         
         win.innerHTML = `
             <div class="win95-title-bar">
-                <div class="win95-title-bar-icon">${icon}</div>
-                <div class="win95-title-bar-text">${title}</div>
+                <div class="win95-title-bar-icon"></div>
+                <div class="win95-title-bar-text"></div>
                 <div class="win95-title-bar-buttons">
                     <button class="win95-title-bar-button" data-action="minimize">_</button>
                     <button class="win95-title-bar-button" data-action="maximize">□</button>
@@ -703,8 +703,12 @@ class Win95Manager {
             <div class="win95-window-content"></div>
             <div class="win95-resize-handle"></div>
         `;
+        win.querySelector('.win95-title-bar-icon').textContent = icon;
+        win.querySelector('.win95-title-bar-text').textContent = title;
         
-        document.getElementById('desktop').appendChild(win);
+        // Windows must share the same top-level stacking context as the initial
+        // terminal; the desktop itself is a fixed-position stacking context.
+        document.body.appendChild(win);
         this.initWindow(win);
         this.focusWindow(id);
         
@@ -712,14 +716,26 @@ class Win95Manager {
     }
 
     // ===== SHUTDOWN =====
-    shutdown() {
+    async shutdown() {
         if (confirm('Завершить работу Windows 95?')) {
+            try {
+                const runtime = await window.dos95Api.fetch('/api/runtime').then(response => response.json());
+                if (runtime.shutdownEnabled) {
+                    await window.dos95Api.fetch('/api/shutdown', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: '{}'
+                    });
+                }
+            } catch (error) {
+                console.error('Shutdown error:', error);
+            }
             document.body.innerHTML = `
                 <div style="background: #000; color: #fff; display: flex; align-items: center; justify-content: center; height: 100vh; font-family: 'MS Sans Serif'; flex-direction: column;">
                     <h1 style="font-size: 48px; margin-bottom: 20px;">Windows 95</h1>
                     <p style="font-size: 24px;">Теперь компьютер можно выключить</p>
                     <p style="margin-top: 40px; font-size: 18px; color: #888;">
-                        <a href="/" style="color: #fff; text-decoration: underline;">Перезагрузить систему</a>
+                        Сервер DOS95 остановлен. Закройте это окно.
                     </p>
                 </div>
             `;
@@ -728,5 +744,5 @@ class Win95Manager {
 }
 
 // Initialize Window Manager
-const win95Manager = new Win95Manager();
+window.win95Manager = new Win95Manager();
 
