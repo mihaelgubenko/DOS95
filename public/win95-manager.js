@@ -116,11 +116,12 @@ class Win95Manager {
     }
 
     // ===== WINDOW MANAGEMENT =====
-    initWindow(windowElement) {
+    initWindow(windowElement, { dynamic = false } = {}) {
         const windowId = windowElement.id;
         
         const windowData = {
             element: windowElement,
+            dynamic,
             minimized: false,
             maximized: false,
             originalPosition: {
@@ -132,6 +133,11 @@ class Win95Manager {
         };
         
         this.windows.set(windowId, windowData);
+
+        if (windowElement.classList.contains('active')) {
+            windowElement.style.zIndex = ++this.zIndexCounter;
+            this.activeWindow = windowId;
+        }
         
         // Title bar buttons
         const buttons = windowElement.querySelectorAll('.win95-title-bar-button');
@@ -171,23 +177,19 @@ class Win95Manager {
         if (windowData.minimized) {
             win.classList.remove('minimized');
             windowData.minimized = false;
-        } else {
-            win.style.display = 'flex';
         }
+        if (win.style.display === 'none') win.style.removeProperty('display');
         
         this.focusWindow(windowId);
         this.updateTaskbar();
     }
 
     focusWindow(windowId) {
-        // Remove active class from all windows
-        document.querySelectorAll('.win95-window').forEach(w => {
-            w.classList.remove('active');
-            if (w.id !== windowId) w.style.zIndex = '1000';
-        });
-        
         const windowData = this.windows.get(windowId);
-        if (!windowData) return;
+        if (!windowData || windowData.minimized || windowData.element.style.display === 'none') return;
+
+        // Remove active class from all windows while preserving their stacking order.
+        document.querySelectorAll('.win95-window').forEach(w => w.classList.remove('active'));
         
         // Set as active
         windowData.element.classList.add('active');
@@ -196,6 +198,27 @@ class Win95Manager {
         
         // Update taskbar
         this.updateTaskbar();
+    }
+
+    focusTopVisibleWindow(excludedWindowId = null) {
+        let nextWindowId = null;
+        let highestZIndex = -Infinity;
+
+        this.windows.forEach((data, windowId) => {
+            if (windowId === excludedWindowId || data.minimized || data.element.style.display === 'none' || !data.element.isConnected) return;
+            const zIndex = Number.parseInt(data.element.style.zIndex, 10) || 1000;
+            if (zIndex > highestZIndex) {
+                highestZIndex = zIndex;
+                nextWindowId = windowId;
+            }
+        });
+
+        if (nextWindowId) {
+            this.focusWindow(nextWindowId);
+        } else {
+            this.activeWindow = null;
+            this.updateTaskbar();
+        }
     }
 
     handleWindowAction(windowId, action) {
@@ -208,7 +231,13 @@ class Win95Manager {
             case 'minimize':
                 win.classList.add('minimized');
                 windowData.minimized = true;
-                this.updateTaskbar();
+                win.classList.remove('active');
+                if (this.activeWindow === windowId) {
+                    this.activeWindow = null;
+                    this.focusTopVisibleWindow(windowId);
+                } else {
+                    this.updateTaskbar();
+                }
                 break;
                 
             case 'maximize':
@@ -234,8 +263,19 @@ class Win95Manager {
                 break;
                 
             case 'close':
-                win.style.display = 'none';
-                this.updateTaskbar();
+                win.classList.remove('active');
+                if (windowData.dynamic) {
+                    win.remove();
+                    this.windows.delete(windowId);
+                } else {
+                    win.style.display = 'none';
+                }
+                if (this.activeWindow === windowId) {
+                    this.activeWindow = null;
+                    this.focusTopVisibleWindow(windowId);
+                } else {
+                    this.updateTaskbar();
+                }
                 break;
         }
     }
@@ -489,16 +529,24 @@ class Win95Manager {
     }
 
     createDoctorWindow() {
+        const existingWindow = this.windows.get('doctor-window');
+        if (existingWindow) {
+            this.openWindow('doctor-window');
+            existingWindow.element.querySelector('[data-role="doctor-input"]')?.focus();
+            return;
+        }
+
         const win = this.createWindow('doctor-window', 'ELIZA — собеседник', '🧠', 500, 450);
         
         // Создать уникальный sessionId для этого окна ELIZA
-        const doctorSessionId = 'doctor-session-' + Date.now();
+        const uniqueSessionId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const doctorSessionId = `doctor-session-${uniqueSessionId}`;
         win.dataset.doctorSessionId = doctorSessionId;
         
         win.querySelector('.win95-window-content').innerHTML = `
             <div style="display: flex; flex-direction: column; height: 100%; background: var(--win95-gray);">
                 <!-- Chat messages -->
-                <div class="win95-inset-panel" id="doctor-chat" style="flex: 1; overflow-y: auto; margin: 4px; background: white; padding: 8px; font-family: 'MS Sans Serif', sans-serif; font-size: 11px; color: #000000;">
+                <div class="win95-inset-panel" data-role="doctor-chat" style="flex: 1; overflow-y: auto; margin: 4px; background: white; padding: 8px; font-family: 'MS Sans Serif', sans-serif; font-size: 11px; color: #000000;">
                     <div style="margin-bottom: 10px; padding: 8px; background: #ffffcc; border: 1px solid #ccc; color: #000000;">
                         <strong style="color: #000000;">ELIZA:</strong> Инициализация...
                     </div>
@@ -506,7 +554,7 @@ class Win95Manager {
                 
                 <!-- Input area -->
                 <div style="padding: 4px; display: flex; gap: 4px;">
-                    <input type="text" id="doctor-input" placeholder="Введите сообщение..." 
+                    <input type="text" data-role="doctor-input" placeholder="Введите сообщение..."
                            style="flex: 1; padding: 4px; font-family: 'MS Sans Serif', sans-serif; font-size: 11px; color: #000000;" 
                            class="win95-inset-panel">
                     <button class="win95-button" data-role="doctor-send">Отправить</button>
@@ -518,25 +566,24 @@ class Win95Manager {
             </div>
         `;
         
-        win.querySelector('[data-role="doctor-send"]').addEventListener('click', () => this.sendDoctorMessage());
+        const input = win.querySelector('[data-role="doctor-input"]');
+        win.querySelector('[data-role="doctor-send"]').addEventListener('click', () => this.sendDoctorMessage(win));
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') this.sendDoctorMessage(win);
+        });
+        input.focus();
 
         // Инициализировать DOCTOR сеанс
-        setTimeout(async () => {
-            await this.initDoctorSession(doctorSessionId);
-            
-            const input = document.getElementById('doctor-input');
-            if (input) {
-                input.addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter') {
-                        this.sendDoctorMessage();
-                    }
-                });
-                input.focus();
-            }
-        }, 100);
+        this.initDoctorSession(win, doctorSessionId);
     }
     
-    async initDoctorSession(sessionId) {
+    isCurrentDoctorWindow(win, sessionId) {
+        return win.isConnected
+            && win.dataset.doctorSessionId === sessionId
+            && this.windows.get('doctor-window')?.element === win;
+    }
+
+    async initDoctorSession(win, sessionId) {
         try {
             // Запустить DOCTOR сеанс
             const response = await window.dos95Api.fetch('/api/command', {
@@ -549,9 +596,11 @@ class Win95Manager {
             });
             
             const result = await response.json();
+
+            if (!this.isCurrentDoctorWindow(win, sessionId)) return;
             
             // Показать приветствие
-            const chat = document.getElementById('doctor-chat');
+            const chat = win.querySelector('[data-role="doctor-chat"]');
             if (chat) {
                 let greeting = result.output || 'Здравствуйте. Я виртуальный поддерживающий собеседник.';
                 
@@ -570,18 +619,17 @@ class Win95Manager {
         }
     }
     
-    async sendDoctorMessage() {
-        const input = document.getElementById('doctor-input');
-        const chat = document.getElementById('doctor-chat');
+    async sendDoctorMessage(win) {
+        const input = win?.querySelector('[data-role="doctor-input"]');
+        const chat = win?.querySelector('[data-role="doctor-chat"]');
         
         if (!input || !chat) return;
         
         const message = input.value.trim();
         if (!message) return;
         
-        // Получить sessionId из окна
-        const doctorWindow = document.getElementById('doctor-window');
-        const sessionId = doctorWindow ? doctorWindow.dataset.doctorSessionId : ('doctor-fallback-' + Date.now());
+        const sessionId = win.dataset.doctorSessionId;
+        if (!this.isCurrentDoctorWindow(win, sessionId)) return;
         
         // Добавить сообщение пользователя
         chat.appendChild(this.createDoctorMessage('ВЫ:', message, true));
@@ -604,6 +652,8 @@ class Win95Manager {
             });
             
             const result = await response.json();
+
+            if (!this.isCurrentDoctorWindow(win, sessionId)) return;
             
             // Добавить ответ ELIZA
             let aiText = result.output || 'Ошибка получения ответа';
@@ -637,14 +687,17 @@ class Win95Manager {
             chat.scrollTop = chat.scrollHeight;
             
         } catch (error) {
+            if (!this.isCurrentDoctorWindow(win, sessionId)) return;
             const errorMsg = document.createElement('div');
             errorMsg.style.cssText = 'margin-bottom: 10px; color: red;';
             errorMsg.textContent = 'Ошибка связи с сервером: ' + error.message;
             chat.appendChild(errorMsg);
         }
         
-        input.disabled = false;
-        input.focus();
+        if (this.isCurrentDoctorWindow(win, sessionId)) {
+            input.disabled = false;
+            input.focus();
+        }
     }
     
     createDoctorMessage(label, text, fromUser) {
@@ -682,6 +735,12 @@ class Win95Manager {
     }
 
     createWindow(id, title, icon, width, height) {
+        const existingWindow = this.windows.get(id);
+        if (existingWindow) {
+            this.openWindow(id);
+            return existingWindow.element;
+        }
+
         const win = document.createElement('div');
         win.className = 'win95-window active';
         win.id = id;
@@ -709,7 +768,7 @@ class Win95Manager {
         // Windows must share the same top-level stacking context as the initial
         // terminal; the desktop itself is a fixed-position stacking context.
         document.body.appendChild(win);
-        this.initWindow(win);
+        this.initWindow(win, { dynamic: true });
         this.focusWindow(id);
         
         return win;
