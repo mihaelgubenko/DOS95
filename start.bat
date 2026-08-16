@@ -1,9 +1,9 @@
 @echo off
 chcp 65001 >nul
-title DOS Web System - Server Launch
+title DOS95 - Server Launch
 
 echo ╔════════════════════════════════════════════════════════════╗
-echo ║          DOS Web System v1.0 - Windows 95 Edition         ║
+echo ║               DOS95 v1.1.0 - Windows 95                   ║
 echo ║              Starting server...                            ║
 echo ║                                                            ║
 echo ║   Windows 95: http://localhost:3000                       ║
@@ -38,7 +38,7 @@ if not exist ".env" (
     copy .env.example .env >nul
     echo.
     echo [INFO] Edit the .env file and add your OpenAI API key
-    echo       (or leave empty to work without GPT-4O)
+    echo       (or leave empty to work with local ELIZA)
     echo.
     pause
 )
